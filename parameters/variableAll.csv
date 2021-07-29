@@ -1,12 +1,12 @@
 Symbol,Name,Unit,Param. type,Value
-startYear,,,,2021
-tOpSch,,,,20
-NShipFleet,,,,6
-tbid,,,,2
-lastYear,,,Constant parameter,2050
-regStart,,,,2025
-regSpan,,,,5
-addSysYear,,,,2028
+startYear,,-,,2021
+tOpSch,,-,,20
+NShipFleet,,-,,6
+tbid,,-,,2
+lastYear,,-,Constant parameter,2050
+regStart,,-,,2025
+regSpan,,-,,5
+addSysYear,,-,,2028
 atOnce,,kt,,
 kDWT1,1st DWT coefficients,-,Constant parameter,10.65338296
 kDWT2,2nd DWT coefficients,-,Constant parameter,7340.169512
@@ -126,3 +126,4 @@ profit,,$,,
 profitSum,,$,,
 gSum,,ton,,
 Idx,,$ / ton,,
+dcostFuel,,$,,

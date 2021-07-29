@@ -10,14 +10,10 @@
             // The connection URL has the following format, relative to the current page:
             //     http[s]://<domain>:<port>[/<namespace>]
 
-            function cbChanged() {
-                var a = document.getElementById('cbWPS').checked;
-                socket.emit('cbWPS_event', {val: a});
-            }
-
             var socket = io();
 
             let Nuser = {{ Nuser | tojson }};
+            let valueDict = {{ valueDict | tojson }};
             socket.on('connect', function() {
                 socket.emit('connect_event', {no: Nuser});
             });
@@ -28,85 +24,113 @@
                     cb();
             });
 
-            let table = document.createElement('table');
-            socket.on('my_response_userSelection', function(msg, cb) {
-                var rows = table.rows.length;
-                for (var i=0; i<rows; i++) {
-                    if (table.rows[i].cells[0].innerHTML == 'Player' + msg.no) {
-                        table.rows[i].cells[1].innerHTML = msg.type;
-                        table.rows[i].cells[2].innerHTML = msg.name;
-                        return
-                    }
-                }
-                var newRow = table.insertRow(-1);
-                var newCell1 = newRow.insertCell(-1);
-                newCell1.innerHTML = 'Player' + msg.no;
-                var newCell2 = newRow.insertCell(-1);
-                newCell2.innerHTML = msg.type;
-                var newCell3 = newRow.insertCell(-1);
-                newCell3.innerHTML = msg.name;
-                document.getElementById('userTable').appendChild(table);
+            let userTable = document.createElement('table');
+            var newRow = userTable.insertRow(-1);
+            var newCell1 = newRow.insertCell(-1);
+            newCell1.innerHTML = 'No.'
+            var newCell2 = newRow.insertCell(-1);
+            newCell2.innerHTML = 'Role'
+            var newCell3 = newRow.insertCell(-1);
+            newCell3.innerHTML = 'Name'
+            var newCell4 = newRow.insertCell(-1);
+            newCell4.innerHTML = 'State'
+            socket.on('my_response_userTable', function(msg, cb) {
+                var userDict = JSON.parse(msg.userDict)
+                var i = 0
+                var ifState = 0
+                if (userTable.rows[0].cells[0].innerHTML == 'No.') {
+                    var rows = userTable.rows.length;
+                    for (var i=1; i<rows; i++) {
+                        userTable.rows[1].remove()
+                    };
+                    for (var userID of Object.keys(userDict)) {
+                        var newRow = userTable.insertRow(-1);
+                        var newCell1 = newRow.insertCell(-1);
+                        newCell1.innerHTML = userDict[userID]['userNo']
+                        var newCell2 = newRow.insertCell(-1);
+                        newCell2.innerHTML = userDict[userID]['userType']
+                        var newCell3 = newRow.insertCell(-1);
+                        newCell3.innerHTML = userDict[userID]['userName']
+                        var newCell4 = newRow.insertCell(-1);
+                        newCell4.innerHTML = userDict[userID]['state']
+                        if (userDict[userID]['state'] != 'Done') {
+                            ifState = ifState + 1;
+                        };
+                    };
+                    //if (ifState == 0) {
+                        //socket.emit('yearlyOperation_event');
+                    //};
+                };
+                document.getElementById('userTable').appendChild(userTable);
                 //$('#log2').append('<br>' + $('<div/>').text(socket.id).html());
-            });
-
-            
+            });          
             socket.on('my_response_selected_regulator', function(msg, cb) {
-                document.getElementById("comment1").remove();
-                document.getElementById("userSelection").remove();
-                document.getElementById("userSelected").remove();
-                document.getElementById("userTable").remove();
-                $('#log2').append('<br>' + $('<div/>').text('You are ' + msg.type + ' ' + msg.name + '?').html());
+                if (document.getElementById("comment1").firstChild) {
+                    document.getElementById("comment1").firstChild.remove();
+                };
+                while (document.getElementById("userSelection").firstChild) {
+                    document.getElementById("userSelection").removeChild(document.getElementById("userSelection").firstChild);
+                }
+                while (document.getElementById("userSelected").firstChild) {
+                    document.getElementById("userSelected").removeChild(document.getElementById("userSelected").firstChild);
+                }
+                $('#log2').append('<br>' + $('<div/>').text('Waiting until other players finish their yearly operation.').html());
                 if (cb)
                     cb();
             });
-
-            let fleetTable = document.createElement('table');
-            var newRow = fleetTable.insertRow(-1);
-            var newCell1 = newRow.insertCell(-1);
-            newCell1.innerHTML = 'No.';
-            var newCell2 = newRow.insertCell(-1);
-            newCell2.innerHTML = 'Delivery year';
-            var newCell3 = newRow.insertCell(-1);
-            newCell3.innerHTML = 'Fuel type';
-            var newCell4 = newRow.insertCell(-1);
-            newCell4.innerHTML = 'Capacity [TEU]';
-            var newCell5 = newRow.insertCell(-1);
-            newCell5.innerHTML = 'WPS';
-            var newCell6 = newRow.insertCell(-1);
-            newCell6.innerHTML = 'SPS';
-            var newCell7 = newRow.insertCell(-1);
-            newCell7.innerHTML = 'CCS';
-            var newCell8 = newRow.insertCell(-1);
-            newCell8.innerHTML = 'Maximum speed [kt]';
-            var newCell9 = newRow.insertCell(-1);
-            newCell9.innerHTML = 'EEXIreq [g/(ton*NM)]';
-            var newCell10 = newRow.insertCell(-1);
-            newCell10.innerHTML = 'EEXIatt [g/(ton*NM)]';
-            var newCell11 = newRow.insertCell(-1);
-            newCell11.innerHTML = 'Scrap';
-            var newCell12 = newRow.insertCell(-1);
-            newCell12.innerHTML = 'Service speed [kt]';
             socket.on('my_response_selected_shipComp', function(msg, cb) {
-                document.getElementById("comment1").remove();
-                document.getElementById("userSelection").remove();
-                document.getElementById("userSelected").remove();
-                document.getElementById("userTable").remove();
+                if (document.getElementById("comment1").firstChild) {
+                    document.getElementById("comment1").firstChild.remove();
+                };
+                while (document.getElementById("userSelection").firstChild) {
+                    document.getElementById("userSelection").removeChild(document.getElementById("userSelection").firstChild);
+                }
+                while (document.getElementById("userSelected").firstChild) {
+                    document.getElementById("userSelected").removeChild(document.getElementById("userSelected").firstChild);
+                }
                 //$('#log2').append('<br>' + $('<div/>').text(msg.type + ' ' + msg.name + ' in ' + msg.elpsyear).html());
                 //$('#log2').append('<br>' + $('<div/>').text(JSON.parse(msg.fleets)['1']['total']['g']).html());
                 let fleets = JSON.parse(msg.fleets)
-                let NumFleet = Object.keys(fleets[msg.no]).length
+                let NumFleet = Object.keys(fleets[msg.NshipComp]).length
+                let fleetTable = document.createElement('table');
+                fleetTable.setAttribute('id','fleetTable');
+                var newRow = fleetTable.insertRow(-1);
+                var newCell1 = newRow.insertCell(-1);
+                newCell1.innerHTML = 'No.';
+                var newCell2 = newRow.insertCell(-1);
+                newCell2.innerHTML = 'Delivery year';
+                var newCell3 = newRow.insertCell(-1);
+                newCell3.innerHTML = 'Fuel type';
+                var newCell4 = newRow.insertCell(-1);
+                newCell4.innerHTML = 'Capacity [TEU]';
+                var newCell5 = newRow.insertCell(-1);
+                newCell5.innerHTML = 'WPS';
+                var newCell6 = newRow.insertCell(-1);
+                newCell6.innerHTML = 'SPS';
+                var newCell7 = newRow.insertCell(-1);
+                newCell7.innerHTML = 'CCS';
+                var newCell8 = newRow.insertCell(-1);
+                newCell8.innerHTML = 'Maximum speed [kt]';
+                var newCell9 = newRow.insertCell(-1);
+                newCell9.innerHTML = 'EEXIreq [g/(ton*NM)]';
+                var newCell10 = newRow.insertCell(-1);
+                newCell10.innerHTML = 'EEXIatt [g/(ton*NM)]';
+                var newCell11 = newRow.insertCell(-1);
+                newCell11.innerHTML = 'Scrap';
+                var newCell12 = newRow.insertCell(-1);
+                newCell12.innerHTML = 'Service speed [kt]';
                 for (var keyFleet=1; keyFleet<NumFleet; keyFleet++) {
-                    var tOpTemp = fleets[msg.no][keyFleet]['tOp']
-                    if (fleets[msg.no][keyFleet]['delivery'] <= msg.currentYear & tOpTemp < msg.tOpSch) {
+                    var tOpTemp = fleets[msg.NshipComp][keyFleet]['tOp']
+                    if (tOpTemp < msg.tOpSch) {
                         var newRow = fleetTable.insertRow(-1);
                         var newCell1 = newRow.insertCell(-1);
                         newCell1.innerHTML = keyFleet;
                         var newCell2 = newRow.insertCell(-1);
-                        newCell2.innerHTML = fleets[msg.no][keyFleet]['delivery'];
+                        newCell2.innerHTML = fleets[msg.NshipComp][keyFleet]['delivery'];
                         var newCell3 = newRow.insertCell(-1);
-                        newCell3.innerHTML = fleets[msg.no][keyFleet]['fuelName'];
+                        newCell3.innerHTML = fleets[msg.NshipComp][keyFleet]['fuelName'];
                         var newCell4 = newRow.insertCell(-1);
-                        newCell4.innerHTML = fleets[msg.no][keyFleet]['CAPcnt'];
+                        newCell4.innerHTML = fleets[msg.NshipComp][keyFleet]['CAPcnt'];
                         var newCell5 = newRow.insertCell(-1);
                         newCell5.innerHTML = '<input type="checkbox" class="cbs" id="cbwps'+keyFleet+'">';
                         var newCell6 = newRow.insertCell(-1);
@@ -114,32 +138,695 @@
                         var newCell7 = newRow.insertCell(-1);
                         newCell7.innerHTML = '<input type="checkbox" class="cbs" id="cbccs'+keyFleet+'">';
                         var newCell8 = newRow.insertCell(-1);
-                        newCell8.innerHTML = fleets[msg.no][keyFleet]['vDsgnRed'][tOpTemp];
+                        newCell8.innerHTML = fleets[msg.NshipComp][keyFleet]['vDsgnRed'][tOpTemp];
                         var newCell9 = newRow.insertCell(-1);
-                        var EEDIreq = fleets[msg.no][keyFleet]['EEDIreq'][tOpTemp];
+                        var EEDIreq = fleets[msg.NshipComp][keyFleet]['EEDIreq'][tOpTemp];
                         newCell9.innerHTML = Math.floor( EEDIreq * Math.pow( 10, 2 ) ) / Math.pow( 10, 2 );
                         var newCell10 = newRow.insertCell(-1);
-                        var EEDIatt = fleets[msg.no][keyFleet]['EEDIatt'][tOpTemp];
-                        newCell10.innerHTML = Math.floor( EEDIatt * Math.pow( 10, 2 ) ) / Math.pow( 10, 2 );;
+                        var EEDIatt = fleets[msg.NshipComp][keyFleet]['EEDIatt'][tOpTemp];
+                        newCell10.innerHTML = Math.floor( EEDIatt * Math.pow( 10, 2 ) ) / Math.pow( 10, 2 );
                         var newCell11 = newRow.insertCell(-1);
-                        newCell11.innerHTML = '<input type="checkbox" id="scrap">';
+                        newCell11.innerHTML = '<input type="checkbox" id="scrap'+keyFleet+'">';
                         var newCell12 = newRow.insertCell(-1);
-                        newCell12.innerHTML = '<input type="text" id="speed">';
-                    }
+                        var newCell12Select = document.createElement('select');
+                        newCell12Select.setAttribute("id",'speed'+keyFleet);
+                        //var optionSpeed = document.createElement('option');
+                        //optionSpeed.setAttribute('disabled', true);
+                        //optionSpeed.setAttribute('selected', true);
+                        //optionSpeed.innerHTML = 'Select service speed.';
+                        //newCell12Select.appendChild(optionSpeed);
+                        for (var i = valueDict['vMin']; i <= fleets[msg.NshipComp][keyFleet]['vDsgnRed'][tOpTemp]; i++) {
+                            var optionSpeed = document.createElement('option');
+                            optionSpeed.setAttribute('value', i);
+                            optionSpeed.innerHTML = i;
+                            newCell12Select.appendChild(optionSpeed);
+                        };
+                        newCell12Select.value = fleets[msg.NshipComp][keyFleet]['vDsgnRed'][tOpTemp];
+                        if (fleets[msg.NshipComp][keyFleet]['delivery'] > msg.currentYear) {
+                            newRow.style.color = 'grey';
+                        }
+                        newCell12.appendChild(newCell12Select);
+                    };
+                };
+                document.getElementById('fleetList').appendChild(fleetTable);
+                var atOnceButton1 = document.createElement('input');
+                atOnceButton1.setAttribute("type","submit");
+                atOnceButton1.setAttribute("id","wpsAtOnce");
+                atOnceButton1.setAttribute("value","Check all WPS at once");
+                document.getElementById('atOnce').appendChild(atOnceButton1);
+                var atOnceButton2 = document.createElement('input');
+                atOnceButton2.setAttribute("type","submit");
+                atOnceButton2.setAttribute("id","spsAtOnce");
+                atOnceButton2.setAttribute("value","Check all SPS at once");
+                document.getElementById('atOnce').appendChild(atOnceButton2);
+                var atOnceButton3 = document.createElement('input');
+                atOnceButton3.setAttribute("type","submit");
+                atOnceButton3.setAttribute("id","ccsAtOnce");
+                atOnceButton3.setAttribute("value","Check all CCS at once");
+                document.getElementById('atOnce').appendChild(atOnceButton3);
+                var atOnceButton4 = document.createElement('select');
+                atOnceButton4.setAttribute("id","speedAtOnceText");
+                var optionSpeedAtOnce = document.createElement('option');
+                optionSpeedAtOnce.setAttribute('disabled', true);
+                optionSpeedAtOnce.setAttribute('selected', true);
+                optionSpeedAtOnce.innerHTML = 'Select service speed for all fleets.';
+                atOnceButton4.appendChild(optionSpeedAtOnce);
+                for (var j = valueDict['vMin']; j <= valueDict['vDsgn']; j++) {
+                    var optionSpeedAtOnce = document.createElement('option');
+                    optionSpeedAtOnce.setAttribute('value', j);
+                    optionSpeedAtOnce.innerHTML = j;
+                    atOnceButton4.appendChild(optionSpeedAtOnce);
+                };
+                document.getElementById('atOnce').appendChild(atOnceButton4);
+                var atOnceButton5 = document.createElement('input');
+                atOnceButton5.setAttribute("type","submit");
+                atOnceButton5.setAttribute("id","speedAtOnceButton");
+                atOnceButton5.setAttribute("value","Input");
+                document.getElementById('atOnce').appendChild(atOnceButton5);
+
+                let orderTable = document.createElement('table');
+                orderTable.setAttribute('id','orderTable');
+                var newRow = orderTable.insertRow(-1);
+                var newCell1 = newRow.insertCell(-1);
+                newCell1.innerHTML = 'No.';
+                var newCell2 = newRow.insertCell(-1);
+                newCell2.innerHTML = 'Delivery year';
+                var newCell3 = newRow.insertCell(-1);
+                newCell3.innerHTML = 'Fuel type';
+                var newCell4 = newRow.insertCell(-1);
+                newCell4.innerHTML = 'Capacity [TEU]';
+                var newCell5 = newRow.insertCell(-1);
+                newCell5.innerHTML = 'WPS';
+                var newCell6 = newRow.insertCell(-1);
+                newCell6.innerHTML = 'SPS';
+                var newCell7 = newRow.insertCell(-1);
+                newCell7.innerHTML = 'CCS';
+                var newCell8 = newRow.insertCell(-1);
+                newCell8.innerHTML = 'Maximum speed [kt]';
+                var newCell9 = newRow.insertCell(-1);
+                newCell9.innerHTML = 'EEXIreq [g/(ton*NM)]';
+                var newCell10 = newRow.insertCell(-1);
+                newCell10.innerHTML = 'EEXIatt [g/(ton*NM)]';
+                var newCell11 = newRow.insertCell(-1);
+                var addOrderButton = document.createElement('input');
+                addOrderButton.setAttribute("type","submit");
+                addOrderButton.setAttribute("class","addOrderButtons");
+                addOrderButton.setAttribute("value","Add");
+                newCell11.appendChild(addOrderButton);
+                
+                var newRow = orderTable.insertRow(-1);
+                var newCell1 = newRow.insertCell(-1);
+                newCell1.innerHTML = keyFleet;
+                var newCell2 = newRow.insertCell(-1);
+                newCell2.innerHTML = msg.currentYear + 2;
+                var newCell3 = newRow.insertCell(-1);
+                var newCell3Select = document.createElement('select');
+                newCell3Select.setAttribute('id','fuelTypeSelect'+keyFleet)
+                newCell3Select.setAttribute('class','orderChanges')
+                var fuelTypeArr = ['HFO/Diesel','LNG','NH3','H2']
+                if (msg.currentYear >= valueDict['addSysYear']) {
+                    NfuelType = 3;
+                } else {
+                    NfuelType = 1;
                 }
-                document.getElementById('fleetTable').appendChild(fleetTable);
+                //var optionFuel = document.createElement('option');
+                //optionFuel.setAttribute('disabled', true);
+                //optionFuel.setAttribute('selected', true);
+                //optionFuel.innerHTML = 'Select fuel type.';
+                //newCell3Select.appendChild(optionFuel);
+                for (var j = 0; j <= NfuelType; j++) {
+                    var optionFuel = document.createElement('option');
+                    optionFuel.setAttribute('value', fuelTypeArr[j]);
+                    optionFuel.innerHTML = fuelTypeArr[j];
+                    newCell3Select.appendChild(optionFuel);
+                };
+                newCell3.appendChild(newCell3Select)
+                var newCell4 = newRow.insertCell(-1);
+                var newCell4Select = document.createElement('select');
+                newCell4Select.setAttribute('id','capSelect'+keyFleet)
+                newCell4Select.setAttribute('class','orderChanges')
+                //var optionCAP = document.createElement('option');
+                //optionCAP.setAttribute('disabled', true);
+                //optionCAP.setAttribute('selected', true);
+                //optionCAP.innerHTML = 'Select container capacity.';
+                //newCell4Select.appendChild(optionCAP);
+                for (var j = valueDict['CAPcntMin']; j <= valueDict['CAPcntMax']; j=j+1000) {
+                    var optionCAP = document.createElement('option');
+                    optionCAP.setAttribute('value', j);
+                    optionCAP.innerHTML = j;
+                    newCell4Select.appendChild(optionCAP);
+                };
+                newCell4.appendChild(newCell4Select)
+                var newCell5 = newRow.insertCell(-1);
+                newCell5.innerHTML = '<input type="checkbox" class="orderChanges" id="cbwps'+keyFleet+'">';
+                var newCell6 = newRow.insertCell(-1);
+                newCell6.innerHTML = '<input type="checkbox" class="orderChanges" id="cbsps'+keyFleet+'">';
+                var newCell7 = newRow.insertCell(-1);
+                newCell7.innerHTML = '<input type="checkbox" class="orderChanges" id="cbccs'+keyFleet+'">';
+                var newCell8 = newRow.insertCell(-1);
+                newCell8.innerHTML = 'vDsgnRed';
+                var newCell9 = newRow.insertCell(-1);
+                newCell9.innerHTML = 'EEXIreq';
+                var newCell10 = newRow.insertCell(-1);
+                newCell10.innerHTML = 'EEXIatt';
+                var newCell11 = newRow.insertCell(-1);
+                var removeButton = document.createElement('input');
+                removeButton.setAttribute("type","submit");
+                removeButton.setAttribute('id','remove'+keyFleet)
+                removeButton.setAttribute("class","removeButtons");
+                removeButton.setAttribute("value","Remove");
+                newCell11.appendChild(removeButton);
+                document.getElementById('orderList').appendChild(orderTable);
+                if (document.getElementById('cbwps'+keyFleet).checked) {
+                    var WPS = 1;
+                } else {
+                    var WPS = 0;
+                }
+                if (document.getElementById('cbsps'+keyFleet).checked) {
+                    var SPS = 1;
+                } else {
+                    var SPS = 0;
+                }
+                if (document.getElementById('cbccs'+keyFleet).checked) {
+                    var CCS = 1;
+                } else {
+                    var CCS = 0;
+                }
+                var nextButton = document.createElement('input');
+                nextButton.setAttribute('type','submit');
+                nextButton.setAttribute('id','nextYearButton');
+                nextButton.setAttribute('value','Show result');
+                document.getElementById('nextYear').appendChild(nextButton);
+                socket.emit('orderList_event', {fuelType: newCell3Select.value, CAPcnt: newCell4Select.value, WPS: WPS, SPS: SPS, CCS: CCS, keyFleet: keyFleet});
             });
 
+            $(document).on('click', '#wpsAtOnce', function(){
+                var sysDict = {};
+                var fleetTable = document.getElementById('fleetTable');
+                var rows = fleetTable.rows.length
+                for (var i=1; i<rows; i++) {
+                    var keyFleet = fleetTable.rows[i].cells[0].innerHTML
+                    sysDict[i] = {}
+                    if (document.getElementById('cbwps'+keyFleet).checked) {
+                        document.getElementById('cbwps'+keyFleet).checked = false;
+                    } else {
+                        document.getElementById('cbwps'+keyFleet).checked = true;
+                    }
+                    if (document.getElementById('cbwps'+keyFleet).checked) {
+                        sysDict[i].WPS = 1;
+                    } else {
+                        sysDict[i].WPS = 0;
+                    }
+                    if (document.getElementById('cbsps'+keyFleet).checked) {
+                        sysDict[i].SPS = 1;
+                    } else {
+                        sysDict[i].SPS = 0;
+                    }
+                    if (document.getElementById('cbccs'+keyFleet).checked) {
+                        sysDict[i].CCS = 1;
+                    } else {
+                        sysDict[i].CCS = 0;
+                    }
+                }
+                socket.emit('wpsAtOnce_event', sysDict);
+            });
+            $(document).on('click', '#spsAtOnce', function(){
+                var sysDict = {};
+                var fleetTable = document.getElementById('fleetTable');
+                var rows = fleetTable.rows.length
+                for (var i=1; i<rows; i++) {
+                    var keyFleet = fleetTable.rows[i].cells[0].innerHTML
+                    sysDict[i] = {}
+                    if (document.getElementById('cbsps'+keyFleet).checked) {
+                        document.getElementById('cbsps'+keyFleet).checked = false;
+                    } else {
+                        document.getElementById('cbsps'+keyFleet).checked = true;
+                    }
+                    if (document.getElementById('cbwps'+keyFleet).checked) {
+                        sysDict[i].WPS = 1;
+                    } else {
+                        sysDict[i].WPS = 0;
+                    }
+                    if (document.getElementById('cbsps'+keyFleet).checked) {
+                        sysDict[i].SPS = 1;
+                    } else {
+                        sysDict[i].SPS = 0;
+                    }
+                    if (document.getElementById('cbccs'+keyFleet).checked) {
+                        sysDict[i].CCS = 1;
+                    } else {
+                        sysDict[i].CCS = 0;
+                    }
+                }
+                socket.emit('spsAtOnce_event', sysDict);
+            });
+            $(document).on('click', '#ccsAtOnce', function(){
+                var sysDict = {};
+                var fleetTable = document.getElementById('fleetTable');
+                var rows = fleetTable.rows.length
+                for (var i=1; i<rows; i++) {
+                    var keyFleet = fleetTable.rows[i].cells[0].innerHTML
+                    if (document.getElementById('cbccs'+keyFleet).checked) {
+                        document.getElementById('cbccs'+keyFleet).checked = false;
+                    } else {
+                        document.getElementById('cbccs'+keyFleet).checked = true;
+                    }
+                    sysDict[i] = {}
+                    if (document.getElementById('cbwps'+keyFleet).checked) {
+                        sysDict[i].WPS = 1;
+                    } else {
+                        sysDict[i].WPS = 0;
+                    }
+                    if (document.getElementById('cbsps'+keyFleet).checked) {
+                        sysDict[i].SPS = 1;
+                    } else {
+                        sysDict[i].SPS = 0;
+                    }
+                    if (document.getElementById('cbccs'+keyFleet).checked) {
+                        sysDict[i].CCS = 1;
+                    } else {
+                        sysDict[i].CCS = 0;
+                    }
+                }
+                socket.emit('ccsAtOnce_event', sysDict);
+            });
+            $(document).on('click', '#speedAtOnceButton', function(){
+                var atOnceSpeed = document.getElementById('speedAtOnceText').value;
+                if (atOnceSpeed >= valueDict['vMin']) {
+                    socket.emit('speedAtOnce_event', {'val': atOnceSpeed})
+                }
+            });
+            $(document).on('click', '.addOrderButtons', function(){
+                var fleetTable = document.getElementById('fleetTable');
+                var rows = fleetTable.rows.length
+                var orderTable = document.getElementById('orderTable');
+                var rowsOrder = orderTable.rows.length
+                var keyFleet = parseInt(fleetTable.rows[rows-1].cells[0].innerHTML) + rowsOrder;
+                var newRow = orderTable.insertRow(-1);
+                var newCell1 = newRow.insertCell(-1);
+                newCell1.innerHTML = keyFleet;
+                var newCell2 = newRow.insertCell(-1);
+                var currentYear = 'currentYear';
+                newCell2.innerHTML = currentYear
+                var newCell3 = newRow.insertCell(-1);
+                var newCell3Select = document.createElement('select');
+                newCell3Select.setAttribute('id','fuelTypeSelect'+keyFleet)
+                newCell3Select.setAttribute('class','orderChanges')
+                var fuelTypeArr = ['HFO/Diesel','LNG','NH3','H2']
+                if (currentYear >= valueDict['addSysYear']) {
+                    NfuelType = 3;
+                } else {
+                    NfuelType = 1;
+                }
+                for (var j = 0; j <= NfuelType; j++) {
+                    var optionFuel = document.createElement('option');
+                    optionFuel.setAttribute('value', fuelTypeArr[j]);
+                    optionFuel.innerHTML = fuelTypeArr[j];
+                    newCell3Select.appendChild(optionFuel);
+                };
+                newCell3.appendChild(newCell3Select)
+                var newCell4 = newRow.insertCell(-1);
+                var newCell4Select = document.createElement('select');
+                newCell4Select.setAttribute('id','capSelect'+keyFleet)
+                newCell4Select.setAttribute('class','orderChanges')
+                for (var j = valueDict['CAPcntMin']; j <= valueDict['CAPcntMax']; j=j+1000) {
+                    var optionCAP = document.createElement('option');
+                    optionCAP.setAttribute('value', j);
+                    optionCAP.innerHTML = j;
+                    newCell4Select.appendChild(optionCAP);
+                };
+                newCell4.appendChild(newCell4Select)
+                var newCell5 = newRow.insertCell(-1);
+                newCell5.innerHTML = '<input type="checkbox" class="orderChanges" id="cbwps'+keyFleet+'">';
+                var newCell6 = newRow.insertCell(-1);
+                newCell6.innerHTML = '<input type="checkbox" class="orderChanges" id="cbsps'+keyFleet+'">';
+                var newCell7 = newRow.insertCell(-1);
+                newCell7.innerHTML = '<input type="checkbox" class="orderChanges" id="cbccs'+keyFleet+'">';
+                var newCell8 = newRow.insertCell(-1);
+                newCell8.innerHTML = 'vDsgnRed';
+                var newCell9 = newRow.insertCell(-1);
+                newCell9.innerHTML = 'EEXIreq';
+                var newCell10 = newRow.insertCell(-1);
+                newCell10.innerHTML = 'EEXIatt';
+                var newCell11 = newRow.insertCell(-1);
+                var remButton = document.createElement('input');
+                remButton.setAttribute('id','remove'+keyFleet)
+                remButton.setAttribute('class','removeButtons')
+                remButton.setAttribute('type','submit')
+                remButton.setAttribute('value','Remove')
+                newCell11.appendChild(remButton);
+                document.getElementById('orderList').appendChild(orderTable);
+                if (document.getElementById('cbwps'+keyFleet).checked) {
+                    var WPS = 1;
+                } else {
+                    var WPS = 0;
+                }
+                if (document.getElementById('cbsps'+keyFleet).checked) {
+                    var SPS = 1;
+                } else {
+                    var SPS = 0;
+                }
+                if (document.getElementById('cbccs'+keyFleet).checked) {
+                    var CCS = 1;
+                } else {
+                    var CCS = 0;
+                }
+                socket.emit('orderList_event', {fuelType: newCell3Select.value, CAPcnt: newCell4Select.value, WPS: WPS, SPS: SPS, CCS: CCS, keyFleet: keyFleet});
+            });
+            $(document).on('click', '.removeButtons', function(){
+                var keyFleetThis = parseInt(this.id.substr(6))
+                var orderTable = document.getElementById('orderTable');
+                var rows = orderTable.rows.length;
+                for (var i=1; i<rows-1; i++) {
+                    if (parseInt(orderTable.rows[i].cells[0].innerHTML) >= keyFleetThis) {
+                        orderTable.rows[i].cells[2].firstChild.value = orderTable.rows[i+1].cells[2].firstChild.value;
+                        orderTable.rows[i].cells[3].firstChild.value = orderTable.rows[i+1].cells[3].firstChild.value;
+                        orderTable.rows[i].cells[4].firstChild.value = orderTable.rows[i+1].cells[4].firstChild.value;
+                        orderTable.rows[i].cells[5].firstChild.value = orderTable.rows[i+1].cells[5].firstChild.value;
+                        orderTable.rows[i].cells[6].firstChild.value = orderTable.rows[i+1].cells[6].firstChild.value;
+                        orderTable.rows[i].cells[7].innerHTML = orderTable.rows[i+1].cells[7].innerHTML;
+                        orderTable.rows[i].cells[8].innerHTML = orderTable.rows[i+1].cells[8].innerHTML;
+                        orderTable.rows[i].cells[9].innerHTML = orderTable.rows[i+1].cells[9].innerHTML;
+                    }                 
+                };
+                orderTable.rows[rows-1].remove();
+            });
+            $(document).on('click', '#nextYearButton', function(){
+                var fleetDict = {};
+                var fleetTable = document.getElementById('fleetTable');
+                var fleetRows = fleetTable.rows.length
+                for (var i=1; i<fleetRows; i++) {
+                    if (fleetTable.rows[i].style.color != 'grey') {
+                        var keyFleet = fleetTable.rows[i].cells[0].innerHTML
+                        fleetDict[keyFleet] = {}
+                        if (document.getElementById('scrap'+keyFleet).checked) {
+                            fleetDict[keyFleet].scrap = 1;
+                        } else {
+                            fleetDict[keyFleet].scrap = 0;
+                        }
+                        fleetDict[keyFleet].speed = document.getElementById('speed'+keyFleet).value;
+                    };
+                };
+                var orderDict = {};
+                var orderTable = document.getElementById('orderTable');
+                var orderRows = orderTable.rows.length
+                for (var i=1; i<orderRows; i++) {
+                    var keyFleet = orderTable.rows[i].cells[0].innerHTML
+                    orderDict[i] = {}
+                    orderDict[i].fuelType = document.getElementById('fuelTypeSelect'+keyFleet).value;
+                    orderDict[i].CAPcnt = document.getElementById('capSelect'+keyFleet).value;
+                    if (document.getElementById('cbwps'+keyFleet).checked) {
+                        orderDict[i].WPS = 1;
+                    } else {
+                        orderDict[i].WPS = 0;
+                    }
+                    if (document.getElementById('cbsps'+keyFleet).checked) {
+                        orderDict[i].SPS = 1;
+                    } else {
+                        orderDict[i].SPS = 0;
+                    }
+                    if (document.getElementById('cbccs'+keyFleet).checked) {
+                        orderDict[i].CCS = 1;
+                    } else {
+                        orderDict[i].CCS = 0;
+                    }
+                }
+                while (document.getElementById("fleetList").firstChild) {
+                    document.getElementById("fleetList").removeChild(document.getElementById("fleetList").firstChild);
+                }
+                while (document.getElementById("atOnce").firstChild) {
+                    document.getElementById("atOnce").removeChild(document.getElementById("atOnce").firstChild);
+                }
+                document.getElementById("orderList").firstChild.remove();
+                document.getElementById("nextYear").firstChild.remove();
+                
+                socket.emit('nextYear_event', fleetDict, orderDict);
+            });
+            $(document).on('click', '#finishResultButton', function(){
+                while (document.getElementById("result").firstChild) {
+                    document.getElementById("result").removeChild(document.getElementById("result").firstChild);
+                };
+                socket.emit('userSelected_event');
+            });
+            $(document).on('click', '#regNext', function(){
+                $('#log2').append('<br>' + $('<div/>').text('Waiting until other players finish their yearly operation.').html());
+                var rEEDIreq1 = document.getElementById('rEEDIreq1').value;
+                var rEEDIreq2 = document.getElementById('rEEDIreq2').value;
+                var rEEDIreq3 = document.getElementById('rEEDIreq3').value;
+                var Subsidy = document.getElementById('Subsidy').value;
+                var Ctax = document.getElementById('Ctax').value;
+                socket.emit('regulatorOperation_event', {'rEEDIreq1': rEEDIreq1, 'rEEDIreq2': rEEDIreq2, 'rEEDIreq3': rEEDIreq3, 'Subsidy': Subsidy, 'Ctax': Ctax})
+            });
+            
+            socket.on('my_response_regulator_operation', function(msg, cb) {
+                var regDec = JSON.parse(msg.regDec);
+                var regTable = document.createElement('table');
+                var newRow = regTable.insertRow(-1);
+                var newCell1 = newRow.insertCell(-1);
+                newCell1.innerHTML = 'wDWT >= 200,000';
+                var newCell2 = newRow.insertCell(-1);
+                var rateSelect1 = document.createElement('select');
+                rateSelect1.setAttribute('id','rEEDIreq1');
+                for (var i=0; i<=100; i=i+5) {
+                    var rateOption = document.createElement('option');
+                    rateOption.setAttribute('value',i);
+                    rateOption.innerHTML = i+'%';
+                    rateSelect1.appendChild(rateOption);
+                };
+                newCell2.appendChild(rateSelect1);
+                var newRow = regTable.insertRow(-1);
+                var newCell1 = newRow.insertCell(-1);
+                newCell1.innerHTML = '120,000 <= wDWT < 200,000';
+                var newCell2 = newRow.insertCell(-1);
+                var rateSelect1 = document.createElement('select');
+                rateSelect1.setAttribute('id','rEEDIreq2');
+                for (var i=0; i<=100; i=i+5) {
+                    var rateOption = document.createElement('option');
+                    rateOption.setAttribute('value',i);
+                    rateOption.innerHTML = i+'%';
+                    rateSelect1.appendChild(rateOption);
+                };
+                newCell2.appendChild(rateSelect1);
+                var newRow = regTable.insertRow(-1);
+                var newCell1 = newRow.insertCell(-1);
+                newCell1.innerHTML = 'wDWT < 120,000';
+                var newCell2 = newRow.insertCell(-1);
+                var rateSelect1 = document.createElement('select');
+                rateSelect1.setAttribute('id','rEEDIreq3');
+                for (var i=0; i<=100; i=i+5) {
+                    var rateOption = document.createElement('option');
+                    rateOption.setAttribute('value',i);
+                    rateOption.innerHTML = i+'%';
+                    rateSelect1.appendChild(rateOption);
+                };
+                newCell2.appendChild(rateSelect1);
+                var newRow = regTable.insertRow(-1);
+                var newCell1 = newRow.insertCell(-1);
+                newCell1.innerHTML = 'Subsidy rate';
+                var newCell2 = newRow.insertCell(-1);
+                var rateSelect1 = document.createElement('select');
+                rateSelect1.setAttribute('id','Subsidy');
+                for (var i=0; i<=100; i=i+5) {
+                    var rateOption = document.createElement('option');
+                    rateOption.setAttribute('value',i);
+                    rateOption.innerHTML = i+'%';
+                    rateSelect1.appendChild(rateOption);
+                };
+                newCell2.appendChild(rateSelect1);
+                var newRow = regTable.insertRow(-1);
+                var newCell1 = newRow.insertCell(-1);
+                newCell1.innerHTML = 'Carbon tax rate';
+                var newCell2 = newRow.insertCell(-1);
+                var rateSelect1 = document.createElement('select');
+                rateSelect1.setAttribute('id','Ctax');
+                for (var i=0; i<=100; i=i+5) {
+                    var rateOption = document.createElement('option');
+                    rateOption.setAttribute('value',i);
+                    rateOption.innerHTML = i+'%';
+                    rateSelect1.appendChild(rateOption);
+                };
+                newCell2.appendChild(rateSelect1);
+                document.getElementById('regulator').appendChild(regTable);
+                var nextButton = document.createElement('input');
+                nextButton.setAttribute('type','submit');
+                nextButton.setAttribute('value','Next');
+                nextButton.setAttribute('id','regNext');
+                document.getElementById('regulator').appendChild(nextButton);
+            });
+            socket.on('my_response_speedAtOnce', function(msg, cb) {
+                let fleets = JSON.parse(msg.fleets);
+                var fleetTable = document.getElementById('fleetTable');
+                var rows = fleetTable.rows.length;
+                var atOnceSpeed = msg.speed;
+                for (var i=1; i<rows; i++) {
+                    var keyFleet = fleetTable.rows[i].cells[0].innerHTML;
+                    var tOpTemp = fleets[msg.NshipComp][keyFleet]['tOp'];
+                    var vDsgnRed = fleets[msg.NshipComp][keyFleet]['vDsgnRed'][tOpTemp];
+                    if (atOnceSpeed <= vDsgnRed) {
+                        document.getElementById('speed'+keyFleet).value = atOnceSpeed;
+                    } else {
+                        document.getElementById('speed'+keyFleet).value = vDsgnRed;
+                    };
+                };
+            });
+            socket.on('my_response_orderList', function(msg, cb) {
+                var orderTable = document.getElementById('orderTable');
+                var rows = orderTable.rows.length
+                orderTable.rows[rows-1].cells[1].innerHTML = msg.currentYear + 2;
+                orderTable.rows[rows-1].cells[7].innerHTML = msg.vDsgnRed;
+                var EEDIreq = Math.floor( msg.EEDIreq * Math.pow( 10, 2 ) ) / Math.pow( 10, 2 );
+                orderTable.rows[rows-1].cells[8].innerHTML = EEDIreq;
+                var EEDIatt = Math.floor( msg.EEDIatt * Math.pow( 10, 2 ) ) / Math.pow( 10, 2 );
+                orderTable.rows[rows-1].cells[9].innerHTML = EEDIatt;
+            });
+            socket.on('my_response_nextYear', function(msg, cb) {
+                var userDict = JSON.parse(msg.userDict)
+                var ifState = 0
+                for (var userID of Object.keys(userDict)) {
+                    if (userDict[userID]['state'] != 'Viewing results') {
+                        if (userDict[userID]['state'] != 'Waiting') {
+                            ifState = ifState + 1;
+                        };
+                    };
+                };
+                if (ifState == 0) {
+                    socket.emit('yearlyOperation_event');
+                };
+
+            });
+            socket.on('my_response_yearlyOperation', function(msg, cb) {
+                while (document.getElementById("log2").firstChild) {
+                    document.getElementById("log2").firstChild.remove();
+                };
+                var figEach = JSON.parse(msg.figEach)
+                var figTotal = JSON.parse(msg.figTotal)
+                //window.alert(msg.fig)
+                //window.location = msg.fig
+                let resultTable = document.createElement('table');
+                resultTable.setAttribute('id','resultTable')
+                var newRow1 = resultTable.insertRow(-1);
+                var newCell1 = newRow1.insertCell(-1);
+                var img1 = document.createElement("img");
+                img1.src = '/static/figures/'+figEach['profit'];
+                newCell1.appendChild(img1);
+
+                var newCell2 = newRow1.insertCell(-1);
+                let resultChildTable1 = document.createElement('table');
+                resultChildTable1.setAttribute('id','resultChildTable1')
+                var newRowChild1 = resultChildTable1.insertRow(-1);
+                var newCellChild1 = newRowChild1.insertCell(-1);
+                var img2 = document.createElement("img");
+                img2.src = '/static/figures/'+figEach['g'];
+                newCellChild1.appendChild(img2);
+                var newRowChild2 = resultChildTable1.insertRow(-1);
+                var newCellChild2 = newRowChild2.insertCell(-1);
+                var newCell2Select = document.createElement('select');
+                newCell2Select.setAttribute("class",'resultSelect');
+                var optionFig = document.createElement('option');
+                optionFig.setAttribute('value', 'Each');
+                optionFig.innerHTML = 'Each';
+                newCell2Select.appendChild(optionFig);
+                var optionFig = document.createElement('option');
+                optionFig.setAttribute('value', 'Total');
+                optionFig.innerHTML = 'Total';
+                newCell2Select.appendChild(optionFig);
+                newCellChild2.appendChild(newCell2Select);
+                newCell2.appendChild(resultChildTable1);
+
+                var newRow2 = resultTable.insertRow(-1);
+                var newCell3 = newRow2.insertCell(-1);
+                var img3 = document.createElement("img");
+                img3.src = '/static/figures/'+figEach['Idx'];
+                newCell3.appendChild(img3);
+
+                var newCell4 = newRow2.insertCell(-1);
+                let resultChildTable2 = document.createElement('table');
+                resultChildTable2.setAttribute('id','resultChildTable2')
+                var newRowChild1 = resultChildTable2.insertRow(-1);
+                var newCellChild1 = newRowChild1.insertCell(-1);
+                var img4 = document.createElement("img");
+                img4.src = '/static/figures/'+figEach['rocc'];
+                newCellChild1.appendChild(img4);
+                var newRowChild2 = resultChildTable2.insertRow(-1);
+                var newCellChild2 = newRowChild2.insertCell(-1);
+
+                let resultChildChildTable = document.createElement('table');
+                resultChildChildTable.setAttribute('id','resultChildChildTable');
+                var newRowChildChild1 = resultChildChildTable.insertRow(-1);
+                var newCellChildChild1 = newRowChildChild1.insertCell(-1);
+                var newCell2Select = document.createElement('select');
+                newCell2Select.setAttribute("class",'resultSelect');
+                var optionFig = document.createElement('option');
+                optionFig.setAttribute('value', 'Each');
+                optionFig.innerHTML = 'Each';
+                newCell2Select.appendChild(optionFig);
+                var optionFig = document.createElement('option');
+                optionFig.setAttribute('value', 'Total');
+                optionFig.innerHTML = 'Total';
+                newCell2Select.appendChild(optionFig);
+                newCellChildChild1.appendChild(newCell2Select);
+
+                var newCellChildChild2 = newRowChildChild1.insertCell(-1);
+                var newCell2Select = document.createElement('select');
+                newCell2Select.setAttribute("class",'resultSelect');
+                for (var i = 0; i < msg.keyList.length; i++) {
+                    var optionFig = document.createElement('option');
+                    optionFig.setAttribute('value', msg.keyList[i]);
+                    optionFig.innerHTML = msg.keyList[i];
+                    newCell2Select.appendChild(optionFig);
+                };
+                newCellChildChild2.appendChild(newCell2Select);
+                newCellChild2.appendChild(resultChildChildTable);
+                newCell4.appendChild(resultChildTable2);
+                
+                document.getElementById('result').appendChild(resultTable);
+                //for (var i=0; i<msg.keyList.length; i++) {
+                //    var img = document.createElement("img");
+                //    img.src = '/static/'+msg.keyList[i]+'Each'+'.png';
+                //    //img.src = '/static/'+msg.keyList[i]+'Total'+'.png';
+                //    document.getElementById('result').appendChild(img);
+                //};
+                document.getElementById('result').appendChild(document.createElement('br'));
+
+                var finishResultButton = document.createElement('input');
+                finishResultButton.setAttribute('type','submit');
+                finishResultButton.setAttribute('id','finishResultButton');
+                finishResultButton.setAttribute('value','Next year');
+                document.getElementById('result').appendChild(finishResultButton);
+            });
+            socket.on('my_response_result', function(msg, cb) {
+                var figEach = JSON.parse(msg.figEach)
+                var figTotal = JSON.parse(msg.figTotal)
+                var eachOrTotal = document.getElementById('resultChildTable1').rows[1].cells[0].firstChild.value;
+                var img = document.getElementById('resultChildTable1').rows[0].cells[0].firstChild;
+                var oldSrc = img.src;
+                if (eachOrTotal == 'Each') {
+                    img.src = '/static/figures/'+figEach['g'];
+                } else {
+                    img.src = '/static/figures/'+figTotal['g'];
+                };
+                var eachOrTotal = document.getElementById('resultChildChildTable').rows[0].cells[0].firstChild.value;
+                var figSelect = document.getElementById('resultChildChildTable').rows[0].cells[1].firstChild.value;
+                var img = document.getElementById('resultChildTable2').rows[0].cells[0].firstChild;
+                if (eachOrTotal == 'Each') {
+                    img.src = '/static/figures/'+figEach[figSelect];
+                } else {
+                    img.src = '/static/figures/'+figTotal[figSelect];
+                };
+            });
+            $(document).on('change', '#scrap', function(){
+                if (this.checked) {
+                    // Just turn the color of line, not emitting app event
+                    socket.emit('scrap_event', {val: 1});
+                } else {
+                    socket.emit('scrap_event', {val: 0});
+                }
+                
+            });
             $(document).on('change', '.cbs', function(){
-                //window.alert(this.checked);
                 var sysDict = {};
                 var rows = fleetTable.rows.length
                 for (var i=1; i<rows; i++) {
-                    //for (var j=4; j<7; j++) {
-                    //    if (fleetTable.rows[i].cells[j].innerHTML.checked) {
-                    //        window.alert('checked'+i+j);
-                    //    }
-                    //}
                     var keyFleet = fleetTable.rows[i].cells[0].innerHTML
                     sysDict[i] = {}
                     if (document.getElementById('cbwps'+keyFleet).checked) {
@@ -160,19 +847,92 @@
                 }
                 socket.emit('cbs_event', sysDict);
             });
+            $(document).on('change', '.orderChanges', function(){
+                var sysDict = {};
+                var fuelTypeDict = {};
+                var CAPcntDict = {};
+                var orderTable = document.getElementById('orderTable');
+                var rows = orderTable.rows.length
+                for (var i = 1; i < rows; i++) {
+                    sysDict[i] = {}
+                    var keyFleet = orderTable.rows[i].cells[0].innerHTML
+                    if (document.getElementById('cbwps'+keyFleet).checked) {
+                        sysDict[i].WPS = 1;
+                    } else {
+                        sysDict[i].WPS = 0;
+                    }
+                    if (document.getElementById('cbsps'+keyFleet).checked) {
+                        sysDict[i].SPS = 1;
+                    } else {
+                        sysDict[i].SPS = 0;
+                    }
+                    if (document.getElementById('cbccs'+keyFleet).checked) {
+                        sysDict[i].CCS = 1;
+                    } else {
+                        sysDict[i].CCS = 0;
+                    }
+                    fuelTypeDict[i] = document.getElementById('fuelTypeSelect'+keyFleet).value
+                    CAPcntDict[i] = document.getElementById('capSelect'+keyFleet).value
+                }
+                socket.emit('orderChange_event', fuelTypeDict, CAPcntDict, sysDict);
+            });
+            $(document).on('change', '.resultSelect', function(){
+                socket.emit('resultSelect_event');
+            });
 
             socket.on('my_response_refurbish', function(msg, cb) {
                 let fleets = JSON.parse(msg.fleets)
-                let NumFleet = Object.keys(fleets[msg.no]).length
+                let NumFleet = Object.keys(fleets[msg.NshipComp]).length
+                var numAlive = 0
+                var fleetTable = document.getElementById('fleetTable');
+                for (var keyFleet=1; keyFleet<NumFleet; keyFleet++) {
+                    var tOpTemp = fleets[msg.NshipComp][keyFleet]['tOp']
+                    if (fleets[msg.NshipComp][keyFleet]['delivery'] <= msg.currentYear & tOpTemp < msg.tOpSch) {
+                        fleetTable.rows[numAlive+1].cells[7].innerHTML = fleets[msg.NshipComp][keyFleet]['vDsgnRed'][tOpTemp];
+                        var EEDIreq = fleets[msg.NshipComp][keyFleet]['EEDIreq'][tOpTemp];
+                        fleetTable.rows[numAlive+1].cells[8].innerHTML = Math.floor( EEDIreq * Math.pow( 10, 2 ) ) / Math.pow( 10, 2 );
+                        var EEDIatt = fleets[msg.NshipComp][keyFleet]['EEDIatt'][tOpTemp];
+                        fleetTable.rows[numAlive+1].cells[9].innerHTML = Math.floor( EEDIatt * Math.pow( 10, 2 ) ) / Math.pow( 10, 2 );
+                        var selected = fleetTable.rows[numAlive+1].cells[11].firstChild.value;
+                        fleetTable.rows[numAlive+1].cells[11].firstChild.remove();
+                        var newCell12Select = document.createElement('select');
+                        newCell12Select.setAttribute("id",'speed'+keyFleet);
+                        //var optionSpeed = document.createElement('option');
+                        //optionSpeed.setAttribute('disabled', true);
+                        //optionSpeed.innerHTML = 'Select service speed.';
+                        //newCell12Select.appendChild(optionSpeed);
+                        for (var i = valueDict['vMin']; i <= fleets[msg.NshipComp][keyFleet]['vDsgnRed'][tOpTemp]; i++) {
+                            var optionSpeed = document.createElement('option');
+                            optionSpeed.setAttribute('value', i);
+                            optionSpeed.innerHTML = i;
+                            newCell12Select.appendChild(optionSpeed);
+                        };
+                        newCell12Select.value = selected
+                        fleetTable.rows[numAlive+1].cells[11].appendChild(newCell12Select);
+                        numAlive += 1
+                    }
+                }
+            });
+            socket.on('my_response_orderChange', function(msg, cb) {
+                var orderTable = document.getElementById('orderTable');
+                var rows = orderTable.rows.length
+                var orderList = JSON.parse(msg.orderList)
+                for (var keyFleet=1; keyFleet<rows; keyFleet++) {
+                    orderTable.rows[keyFleet].cells[7].innerHTML = orderList[keyFleet]['vDsgnRed'];
+                    var EEDIreq = orderList[keyFleet]['EEDIreq'];
+                    orderTable.rows[keyFleet].cells[8].innerHTML = Math.floor( EEDIreq * Math.pow( 10, 2 ) ) / Math.pow( 10, 2 );
+                    var EEDIatt = orderList[keyFleet]['EEDIatt'];
+                    orderTable.rows[keyFleet].cells[9].innerHTML = Math.floor( EEDIatt * Math.pow( 10, 2 ) ) / Math.pow( 10, 2 );
+                }
+            });
+            socket.on('my_response_scrap', function(msg, cb) {
+                let fleets = JSON.parse(msg.fleets)
+                let NumFleet = Object.keys(fleets[msg.NshipComp]).length
                 var numAlive = 0
                 for (var keyFleet=1; keyFleet<NumFleet; keyFleet++) {
-                    var tOpTemp = fleets[msg.no][keyFleet]['tOp']
-                    if (fleets[msg.no][keyFleet]['delivery'] <= msg.currentYear & tOpTemp < msg.tOpSch) {
-                        fleetTable.rows[numAlive+1].cells[7].innerHTML = fleets[msg.no][keyFleet]['vDsgnRed'][tOpTemp];
-                        var EEDIreq = fleets[msg.no][keyFleet]['EEDIreq'][tOpTemp];
-                        fleetTable.rows[numAlive+1].cells[8].innerHTML = Math.floor( EEDIreq * Math.pow( 10, 2 ) ) / Math.pow( 10, 2 );
-                        var EEDIatt = fleets[msg.no][keyFleet]['EEDIatt'][tOpTemp];
-                        fleetTable.rows[numAlive+1].cells[9].innerHTML = Math.floor( EEDIatt * Math.pow( 10, 2 ) ) / Math.pow( 10, 2 );
+                    var tOpTemp = fleets[msg.NshipComp][keyFleet]['tOp']
+                    if (fleets[msg.NshipComp][keyFleet]['delivery'] <= msg.currentYear & tOpTemp < msg.tOpSch) {
+                        // change color by CSS later if scrap check box is checked
                         numAlive += 1
                     }
                 }
@@ -183,16 +943,12 @@
             //for(var i=1; i<regulatorIDsLen; i++){
                 //socket.to(regulatorIDs[i]).emit('shipComp_ope_event', {data: JSON.parse(msg.regulatorIDs)});
             //}
-            
 
             socket.on('redirect', function(data) {
                 $('#log2').append('<br>' + $('<div/>').text('Oh2').html());
                 window.location = data.url;
             });
 
-            // Handlers for the different forms in the page.
-            // These accept data from the user and send it to the server in a
-            // variety of ways
             $('form#broadcast').submit(function(event) {
                 socket.emit('my_broadcast_event', {data: $('#broadcast_data').val()});
                 return false;
@@ -202,19 +958,10 @@
                 return false;
             });
             $('form#userSelected').submit(function(event) {
-                socket.emit('userSelected_event', {type: document.getElementById("userSelection").radio.value, name: $('#name').val(), no: Nuser});
+                socket.emit('userSelected_event');
                 return false;
             });
-            //$('.cbs').change(function(event) {
-            //    if ($(this).is(":checked")) {
-            //        $('#log2').append('<br>' + $('<div/>').text('Oh2').html());
-            //        socket.emit('cbs_event', {val: 'clicked'});
-            //    }
-            //});
-        });
-        
-        $(document).on('change', '#cbWPS', function(){
-            socket.emit('cbs_event', {val: cb.checked});
+            
         });
     </script>
 </head>
@@ -244,7 +991,19 @@
         </div>
     </form>
     <div id ='userTable'></div>
-    <div id ='fleetTable'></div>
+    <br>
+    <div id='regulator'></div>
+    <div id ='fleetList'></div>
+    <div id ='atOnce'></div>
+    <br>
+    <div id ='orderList'></div>
+    <br>
+    <div id ='nextYear'></div>
+    <br>
+    <div id ='result'></div>
     <div id="log2"></div>
+    <div id="logMessage"></div>
+    <div id="logMessage"></div>
+
 </body>
 </html>

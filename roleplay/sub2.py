@@ -2,6 +2,8 @@ from logging import log
 import numpy as np
 import pandas as pd
 from scipy import interpolate
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 from matplotlib.backend_bases import key_press_handler
@@ -19,6 +21,12 @@ from matplotlib.ticker import MaxNLocator
 from pathlib import Path
 import math
 import copy
+import cv2
+import time
+import json
+import base64
+import io
+import datetime
 #from decimal import Decimal, ROUND_HALF_UP
 
 def readinput(filename):
@@ -1805,6 +1813,116 @@ def outputAllCompany2Func(fleetAll,valueDict,startYear,elapsedYear,keyi,unitDict
     ax.set_ylim(0, y_max)
     ax.legend()
     return fig
+
+def outputAllCompanyAppFunc(fleetAll,valueDict,startYear,elapsedYear,keyi,unitDict,figWidth,figHeight,NshipComp):
+    plt.rcParams.update({'figure.max_open_warning': 0})
+    currentYear = startYear+elapsedYear
+    fig, ax = plt.subplots(1, 1, figsize=(figWidth, figHeight))
+    #fig = Figure(figsize=(figWidth, figHeight))
+    #ax = fig.add_subplot(1,1,1)
+    #plt.subplots_adjust(wspace=0.4, hspace=0.6)
+    ticArr = np.array([2020,2025,2030,2035,2040,2045,2050])
+    if elapsedYear > 0:
+        year = fleetAll['year'][:elapsedYear+1]
+        for numCompany in range(1,NshipComp+1):
+            if numCompany == 1:
+                color = 'tomato'
+            elif numCompany == 2:
+                color = 'gold'
+            elif numCompany == 3:
+                color = 'royalblue'
+            ax.plot(year,fleetAll[numCompany]['total'][keyi][:elapsedYear+1],color=color, marker=".",label="Company"+str(numCompany))
+            ax.set_title(keyi)
+            ax.set_xlabel('Year')
+            ax.ticklabel_format(style="sci",  axis="y",scilimits=(0,0))
+            ax.set_ylabel(unitDict[keyi])
+            #ax.title.set_size(10)
+            #ax.xaxis.label.set_size(10)
+            #ax.get_xaxis().get_major_formatter().set_useOffset(False)
+            #ax.get_xaxis().set_major_locator(MaxNLocator(integer=True))
+            ax.set_xticks(ticArr)
+            #ax.yaxis.label.set_size(10)
+    else:
+        for numCompany in range(1,NshipComp+1):
+            if numCompany == 1:
+                color = 'tomato'
+            elif numCompany == 2:
+                color = 'gold'
+            elif numCompany == 3:
+                color = 'royalblue'
+            ax.scatter(startYear,fleetAll[numCompany]['total'][keyi][0],color=color,label="Company"+str(numCompany))
+            ax.set_title(keyi)
+            ax.set_xlabel('Year')
+            ax.ticklabel_format(style="sci",  axis="y",scilimits=(0,0))
+            ax.set_ylabel(unitDict[keyi])
+            #ax.title.set_size(10)
+            #ax.xaxis.label.set_size(10)
+            #ax.set_xticks(np.array([startYear-1,startYear,startYear+1]))
+            ax.set_xticks(np.array([startYear]))
+            #ax.yaxis.label.set_size(10)
+    if keyi == 'g':
+        IMOgoal = np.full(ticArr.shape,valueDict['IMOgoal']/3)
+        color = 'olivedrab'
+        ax.plot(ticArr,IMOgoal,color=color, marker=".",label="IMO goal")
+    y_min, y_max = ax.get_ylim()
+    ax.set_ylim(0, y_max)
+    ax.legend()
+    resPath = Path(__file__).parent
+    resPath /= '../static/figures'
+    plt.ioff()
+    figName = keyi+'Each'+datetime.datetime.now().strftime('%Y%m%d%H%M%S')+'.png'
+    plt.savefig(str(resPath)+'\\'+figName)
+    plt.close()
+    return figName
+
+def outputAllCompanyTotalAppFunc(fleetAll,valueDict,startYear,elapsedYear,keyi,unitDict,figWidth,figHeight,NshipComp):
+    plt.rcParams.update({'figure.max_open_warning': 0})
+    currentYear = startYear+elapsedYear
+    fig, ax = plt.subplots(1, 1, figsize=(figWidth, figHeight))
+    #fig = Figure(figsize=(figWidth, figHeight))
+    #ax = fig.add_subplot(1,1,1)
+    #plt.subplots_adjust(wspace=0.4, hspace=0.6)
+    ticArr = np.array([2020,2025,2030,2035,2040,2045,2050])
+    year = fleetAll['year'][:elapsedYear+1]
+    for numCompany in range(1,NshipComp+1):
+        if numCompany == 1:
+            color = 'tomato'
+        elif numCompany == 2:
+            color = 'gold'
+        elif numCompany == 3:
+            color = 'royalblue'
+        #ax.plot(year,fleetAll[numCompany]['total'][keyi][:elapsedYear+1],color=color, marker=".",label="Company"+str(numCompany))
+        tempArr = copy.deepcopy(fleetAll[numCompany]['total'][keyi][:elapsedYear+1])
+        if numCompany == 1:
+            barArray = tempArr
+            ax.bar(year, barArray, color=color, label="Company"+str(numCompany))
+        else:
+            ax.bar(year, tempArr, bottom=barArray, color=color, label="Company"+str(numCompany))
+            barArray += tempArr
+        ax.set_title(keyi)
+        ax.set_xlabel('Year')
+        ax.ticklabel_format(style="sci",  axis="y",scilimits=(0,0))
+        ax.set_ylabel(unitDict[keyi])
+        #ax.title.set_size(10)
+        #ax.xaxis.label.set_size(10)
+        #ax.get_xaxis().get_major_formatter().set_useOffset(False)
+        #ax.get_xaxis().set_major_locator(MaxNLocator(integer=True))
+        ax.set_xticks(ticArr)
+        #ax.yaxis.label.set_size(10)
+    if keyi == 'g':
+        IMOgoal = np.full(ticArr.shape,valueDict['IMOgoal'])
+        color = 'olivedrab'
+        ax.plot(ticArr,IMOgoal,color=color, marker=".",label="IMO goal")
+    y_min, y_max = ax.get_ylim()
+    ax.set_ylim(0, y_max)
+    ax.legend()
+    resPath = Path(__file__).parent
+    resPath /= '../static/figures'
+    plt.ioff()
+    figName = keyi+'Total'+datetime.datetime.now().strftime('%Y%m%d%H%M%S')+'.png'
+    plt.savefig(str(resPath)+'\\'+figName)
+    plt.close()
+    return figName
 
 def outputAllCompanyTotalFunc(fleetAll,valueDict,startYear,elapsedYear,keyi,unitDict,figWidth,figHeight):
     plt.rcParams.update({'figure.max_open_warning': 0})
