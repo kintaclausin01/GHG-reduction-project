@@ -5,6 +5,10 @@ from threading import Lock, current_thread
 import time
 import json
 import numpy as np
+import os
+import sys
+parent_dir = os.path.join(os.path.dirname(__file__), '..')
+sys.path.append(parent_dir)
 from roleplay import sub2 as rs
 from pathlib import Path
 import pandas as pd
@@ -12,9 +16,6 @@ from scipy import interpolate
 import csv
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import os
-import sys
-import roleplay.sub2 as rs
 import shutil
 import datetime
 
@@ -43,22 +44,23 @@ class MyEncoder(json.JSONEncoder):
 
 # prepare path for parameter files
 path = str(Path(__file__).parent)
-if os.name == 'nt':
-    path = path+"\\parameters\\"
-elif os.name == 'posix':
-    path = path+"/parameters/"
-parameterFile1 = path+"variableAll.csv"
-parameterFile2 = path+"eqLHVship.csv"
-parameterFile3 = path+"CO2Eff.csv"
-parameterFile4 = path+"unitCostFuel.csv"
-parameterFile5 = path+"costShipBasic.csv"
-parameterFile6 = path+"initialFleet1.csv"
-parameterFile7 = path+"initialFleet2.csv"
-parameterFile8 = path+"initialFleet3.csv"
+pathPara = 'app/../parameters/'
+#if os.name == 'nt':
+#    pathPara = path.replace('app','parameters\\')
+#elif os.name == 'posix':
+#    pathPara = path.replace('app','parameters/')
+parameterFile1 = pathPara+"variableAll.csv"
+parameterFile2 = pathPara+"eqLHVship.csv"
+parameterFile3 = pathPara+"CO2Eff.csv"
+parameterFile4 = pathPara+"unitCostFuel.csv"
+parameterFile5 = pathPara+"costShipBasic.csv"
+parameterFile6 = pathPara+"initialFleet1.csv"
+parameterFile7 = pathPara+"initialFleet2.csv"
+parameterFile8 = pathPara+"initialFleet3.csv"
 #parameterFile9 = path+decisionListName1+".csv"
 #parameterFile10 = path+decisionListName2+".csv"
 #parameterFile11 = path+decisionListName3+".csv"
-parameterFile12 = path+"eqLHVaux.csv"
+parameterFile12 = pathPara+"eqLHVaux.csv"
 
 valueDict, unitDict = rs.readinput(parameterFile1)
 tOpSch = int(valueDict['tOpSch'])
@@ -450,8 +452,8 @@ def yearlyOperation_event():
                 fleets[NshipComp]['total']['rocc'][elapsedYear] = valueDict["rDMax"]
             fleets = rs.yearlyOperationFunc(fleets,NshipComp,startYear,elapsedYear,NShipFleet,tOpSch,valueDict,regDec['Subsidy'][nRegAct],regDec['Ctax'][nRegAct],parameterFile4)
     # prepare the result figures
-    resPath = Path(__file__).parent
-    resPath /= 'static/figures'
+    #resPath = Path(__file__).parent
+    resPath = 'roleplay/../app/static'
     shutil.rmtree(resPath)
     os.mkdir(resPath)
     removeList = []

@@ -559,7 +559,6 @@
                 }
                 document.getElementById("orderList").firstChild.remove();
                 document.getElementById("nextYear").firstChild.remove();
-                
                 socket.emit('nextYear_event', fleetDict, orderDict);
             });
             $(document).on('click', '#finishResultButton', function(){
@@ -700,14 +699,14 @@
                 };
                 var figEach = JSON.parse(msg.figEach)
                 var figTotal = JSON.parse(msg.figTotal)
-                //window.alert(msg.fig)
+                //window.alert('gg')
                 //window.location = msg.fig
                 let resultTable = document.createElement('table');
                 resultTable.setAttribute('id','resultTable')
                 var newRow1 = resultTable.insertRow(-1);
                 var newCell1 = newRow1.insertCell(-1);
                 var img1 = document.createElement("img");
-                img1.src = '/static/figures/'+figEach['profit'];
+                img1.src = '/static/'+figEach['profit'];
                 newCell1.appendChild(img1);
 
                 var newCell2 = newRow1.insertCell(-1);
@@ -716,7 +715,7 @@
                 var newRowChild1 = resultChildTable1.insertRow(-1);
                 var newCellChild1 = newRowChild1.insertCell(-1);
                 var img2 = document.createElement("img");
-                img2.src = '/static/figures/'+figEach['g'];
+                img2.src = '/static/'+figEach['g'];
                 newCellChild1.appendChild(img2);
                 var newRowChild2 = resultChildTable1.insertRow(-1);
                 var newCellChild2 = newRowChild2.insertCell(-1);
@@ -736,7 +735,7 @@
                 var newRow2 = resultTable.insertRow(-1);
                 var newCell3 = newRow2.insertCell(-1);
                 var img3 = document.createElement("img");
-                img3.src = '/static/figures/'+figEach['Idx'];
+                img3.src = '/static/'+figEach['Idx'];
                 newCell3.appendChild(img3);
 
                 var newCell4 = newRow2.insertCell(-1);
@@ -745,7 +744,7 @@
                 var newRowChild1 = resultChildTable2.insertRow(-1);
                 var newCellChild1 = newRowChild1.insertCell(-1);
                 var img4 = document.createElement("img");
-                img4.src = '/static/figures/'+figEach['rocc'];
+                img4.src = '/static/'+figEach['rocc'];
                 newCellChild1.appendChild(img4);
                 var newRowChild2 = resultChildTable2.insertRow(-1);
                 var newCellChild2 = newRowChild2.insertCell(-1);
@@ -801,17 +800,17 @@
                 var img = document.getElementById('resultChildTable1').rows[0].cells[0].firstChild;
                 var oldSrc = img.src;
                 if (eachOrTotal == 'Each') {
-                    img.src = '/static/figures/'+figEach['g'];
+                    img.src = '/static/'+figEach['g'];
                 } else {
-                    img.src = '/static/figures/'+figTotal['g'];
+                    img.src = '/static/'+figTotal['g'];
                 };
                 var eachOrTotal = document.getElementById('resultChildChildTable').rows[0].cells[0].firstChild.value;
                 var figSelect = document.getElementById('resultChildChildTable').rows[0].cells[1].firstChild.value;
                 var img = document.getElementById('resultChildTable2').rows[0].cells[0].firstChild;
                 if (eachOrTotal == 'Each') {
-                    img.src = '/static/figures/'+figEach[figSelect];
+                    img.src = '/static/'+figEach[figSelect];
                 } else {
-                    img.src = '/static/figures/'+figTotal[figSelect];
+                    img.src = '/static/'+figTotal[figSelect];
                 };
             });
             $(document).on('change', '#scrap', function(){

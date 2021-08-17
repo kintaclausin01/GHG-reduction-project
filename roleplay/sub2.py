@@ -21,7 +21,7 @@ from matplotlib.ticker import MaxNLocator
 from pathlib import Path
 import math
 import copy
-import cv2
+#import cv2
 import time
 import json
 import base64
@@ -1868,10 +1868,11 @@ def outputAllCompanyAppFunc(fleetAll,valueDict,startYear,elapsedYear,keyi,unitDi
     ax.set_ylim(0, y_max)
     ax.legend()
     resPath = Path(__file__).parent
-    resPath /= '../static/figures'
+    #resPath /= '../app/static'
+    resPath = 'roleplay/../app/static'
     plt.ioff()
     figName = keyi+'Each'+datetime.datetime.now().strftime('%Y%m%d%H%M%S')+'.png'
-    plt.savefig(str(resPath)+'\\'+figName)
+    plt.savefig(str(resPath)+'/'+figName)
     plt.close()
     return figName
 
@@ -1917,10 +1918,11 @@ def outputAllCompanyTotalAppFunc(fleetAll,valueDict,startYear,elapsedYear,keyi,u
     ax.set_ylim(0, y_max)
     ax.legend()
     resPath = Path(__file__).parent
-    resPath /= '../static/figures'
+    #resPath /= '../app/static'
+    resPath = 'roleplay/../app/static'
     plt.ioff()
     figName = keyi+'Total'+datetime.datetime.now().strftime('%Y%m%d%H%M%S')+'.png'
-    plt.savefig(str(resPath)+'\\'+figName)
+    plt.savefig(str(resPath)+'/'+figName)
     plt.close()
     return figName
 

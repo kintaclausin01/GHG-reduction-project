@@ -6,8 +6,8 @@ WORKDIR /app
 
 ADD . /app
 
-RUN pip install --trusted-host pypi.python.org -r requirements.txt
+RUN pip3 install --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org -r requirements.txt
 
 EXPOSE 80
 
-CMD ["python", "app.py"]
+CMD ["python", "app/app.py"]
