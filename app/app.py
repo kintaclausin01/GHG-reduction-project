@@ -24,7 +24,7 @@ thread = None
 thread_lock = Lock()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app, async_mode=async_mode)
+socketio = SocketIO(app, async_mode=async_mode, ping_timeout=300)
 
 # My Functions
 def background_thread():
