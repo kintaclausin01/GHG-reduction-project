@@ -12,16 +12,18 @@
 
             var socket = io();
 
-            let Nuser = {{ Nuser | tojson }};
             let valueDict = {{ valueDict | tojson }};
             socket.on('connect', function() {
-                socket.emit('connect_event', {no: Nuser});
+                var newGameButton = document.createElement('input');
+                newGameButton.setAttribute('type','submit');
+                newGameButton.setAttribute('value','New game');
+                newGameButton.setAttribute('id','newGameButton');
+                document.getElementById('gameSelect').appendChild(newGameButton);
+                socket.emit('connect_event');
             });
 
             socket.on('my_response_connect', function(msg, cb) {
-                $('#log').append('<br>' + $('<div/>').text('User ' + msg.no + ' is connected.').html());
-                if (cb)
-                    cb();
+                
             });
 
             let userTable = document.createElement('table');
@@ -35,7 +37,7 @@
             var newCell4 = newRow.insertCell(-1);
             newCell4.innerHTML = 'State'
             socket.on('my_response_userTable', function(msg, cb) {
-                var userDict = JSON.parse(msg.userDict)
+                var gameDict = JSON.parse(msg.gameDict)
                 var i = 0
                 var ifState = 0
                 if (userTable.rows[0].cells[0].innerHTML == 'No.') {
@@ -43,17 +45,17 @@
                     for (var i=1; i<rows; i++) {
                         userTable.rows[1].remove()
                     };
-                    for (var userID of Object.keys(userDict)) {
+                    for (var userID of Object.keys(gameDict)) {
                         var newRow = userTable.insertRow(-1);
                         var newCell1 = newRow.insertCell(-1);
-                        newCell1.innerHTML = userDict[userID]['userNo']
+                        newCell1.innerHTML = gameDict[userID]['userNo']
                         var newCell2 = newRow.insertCell(-1);
-                        newCell2.innerHTML = userDict[userID]['userType']
+                        newCell2.innerHTML = gameDict[userID]['userType']
                         var newCell3 = newRow.insertCell(-1);
-                        newCell3.innerHTML = userDict[userID]['userName']
+                        newCell3.innerHTML = gameDict[userID]['userName']
                         var newCell4 = newRow.insertCell(-1);
-                        newCell4.innerHTML = userDict[userID]['state']
-                        if (userDict[userID]['state'] != 'Done') {
+                        newCell4.innerHTML = gameDict[userID]['state']
+                        if (gameDict[userID]['state'] != 'Done') {
                             ifState = ifState + 1;
                         };
                     };
@@ -71,9 +73,6 @@
                 while (document.getElementById("userSelection").firstChild) {
                     document.getElementById("userSelection").removeChild(document.getElementById("userSelection").firstChild);
                 }
-                while (document.getElementById("userSelected").firstChild) {
-                    document.getElementById("userSelected").removeChild(document.getElementById("userSelected").firstChild);
-                }
                 $('#log2').append('<br>' + $('<div/>').text('Waiting until other players finish their yearly operation.').html());
                 if (cb)
                     cb();
@@ -84,9 +83,6 @@
                 };
                 while (document.getElementById("userSelection").firstChild) {
                     document.getElementById("userSelection").removeChild(document.getElementById("userSelection").firstChild);
-                }
-                while (document.getElementById("userSelected").firstChild) {
-                    document.getElementById("userSelected").removeChild(document.getElementById("userSelected").firstChild);
                 }
                 //$('#log2').append('<br>' + $('<div/>').text(msg.type + ' ' + msg.name + ' in ' + msg.elpsyear).html());
                 //$('#log2').append('<br>' + $('<div/>').text(JSON.parse(msg.fleets)['1']['total']['g']).html());
@@ -314,7 +310,7 @@
                 }
                 var nextButton = document.createElement('input');
                 nextButton.setAttribute('type','submit');
-                nextButton.setAttribute('id','nextYearButton');
+                nextButton.setAttribute('id','showResultButton');
                 nextButton.setAttribute('value','Show result');
                 document.getElementById('nextYear').appendChild(nextButton);
                 socket.emit('orderList_event', {fuelType: newCell3Select.value, CAPcnt: newCell4Select.value, WPS: WPS, SPS: SPS, CCS: CCS, keyFleet: keyFleet});
@@ -511,7 +507,7 @@
                 };
                 orderTable.rows[rows-1].remove();
             });
-            $(document).on('click', '#nextYearButton', function(){
+            $(document).on('click', '#showResultButton', function(){
                 var fleetDict = {};
                 var fleetTable = document.getElementById('fleetTable');
                 var fleetRows = fleetTable.rows.length
@@ -576,7 +572,20 @@
                 var Ctax = document.getElementById('Ctax').value;
                 socket.emit('regulatorOperation_event', {'rEEDIreq1': rEEDIreq1, 'rEEDIreq2': rEEDIreq2, 'rEEDIreq3': rEEDIreq3, 'Subsidy': Subsidy, 'Ctax': Ctax})
             });
-            
+            $(document).on('click', '#newGameButton', function(){
+                socket.emit('newGame_event');
+            });
+            $(document).on('click', '#applyName', function(){
+                if (document.getElementById('ifReg').checked) {
+                    socket.emit('userSelection_event', {type: 'Regulator', name: $('#name').val()});
+                } else {
+                    socket.emit('userSelection_event', {type: 'Shipping Company', name: $('#name').val()});
+                };
+            });
+            $(document).on('click', '#toOperation', function(){
+                socket.emit('userSelected_event');
+            });
+
             socket.on('my_response_regulator_operation', function(msg, cb) {
                 var regDec = JSON.parse(msg.regDec);
                 var regTable = document.createElement('table');
@@ -679,11 +688,11 @@
                 orderTable.rows[rows-1].cells[9].innerHTML = EEDIatt;
             });
             socket.on('my_response_nextYear', function(msg, cb) {
-                var userDict = JSON.parse(msg.userDict)
+                var gameDict = JSON.parse(msg.gameDict)
                 var ifState = 0
-                for (var userID of Object.keys(userDict)) {
-                    if (userDict[userID]['state'] != 'Viewing results') {
-                        if (userDict[userID]['state'] != 'Waiting') {
+                for (var userID of Object.keys(gameDict)) {
+                    if (gameDict[userID]['state'] != 'Waiting results') {
+                        if (gameDict[userID]['state'] != 'Waiting') {
                             ifState = ifState + 1;
                         };
                     };
@@ -699,8 +708,6 @@
                 };
                 var figEach = JSON.parse(msg.figEach)
                 var figTotal = JSON.parse(msg.figTotal)
-                //window.alert('gg')
-                //window.location = msg.fig
                 let resultTable = document.createElement('table');
                 resultTable.setAttribute('id','resultTable')
                 var newRow1 = resultTable.insertRow(-1);
@@ -813,6 +820,55 @@
                     img.src = '/static/'+figTotal[figSelect];
                 };
             });
+            socket.on('my_response_newGame', function(msg, cb) {
+                if (document.getElementById("gameSelect").firstChild) {
+                    document.getElementById("gameSelect").firstChild.remove();
+                };
+                var regRad = document.createElement('input');
+                regRad.setAttribute('type','radio');
+                regRad.setAttribute('id','ifReg');
+                regRad.setAttribute('value','Regulator');
+                regRad.setAttribute('name','ifRegShip');
+                var regLabel = document.createElement('label');
+                regLabel.setAttribute('for','ifReg');
+                regLabel.innerText = 'Regulator : '
+                document.getElementById('userSelection').appendChild(regLabel);
+                document.getElementById('userSelection').appendChild(regRad);
+                document.getElementById('userSelection').appendChild(document.createElement('br'));
+                var shipRad = document.createElement('input');
+                shipRad.setAttribute('type','radio');
+                shipRad.setAttribute('id','ifShp');
+                shipRad.setAttribute('value','Shipping Company');
+                shipRad.setAttribute('name','ifRegShip');
+                var shipLabel = document.createElement('label');
+                shipLabel.setAttribute('for','ifShp');
+                shipLabel.innerText = 'Shipping Company : '
+                document.getElementById('userSelection').appendChild(shipLabel);
+                document.getElementById('userSelection').appendChild(shipRad);
+                document.getElementById('ifShp').checked = true;
+                document.getElementById('userSelection').appendChild(document.createElement('br'));
+                var nameText = document.createElement('input');
+                nameText.setAttribute('type','text');
+                nameText.setAttribute('id','name');
+                var nameLabel = document.createElement('label');
+                nameLabel.setAttribute('for','name');
+                nameLabel.innerText = 'Name : ';
+                document.getElementById('userSelection').appendChild(nameLabel);
+                document.getElementById('userSelection').appendChild(nameText);
+                document.getElementById('userSelection').appendChild(document.createElement('br'));
+                var applyButton = document.createElement('input');
+                applyButton.setAttribute('type','submit');
+                applyButton.setAttribute('id','applyName');
+                applyButton.setAttribute('value','Apply');
+                document.getElementById('userSelection').appendChild(applyButton);
+                var nextButton = document.createElement('input');
+                nextButton.setAttribute('type','submit');
+                nextButton.setAttribute('id','toOperation');
+                nextButton.setAttribute('value','Next');
+                document.getElementById('userSelection').appendChild(nextButton);
+                document.getElementById('userSelection').appendChild(document.createElement('br'));
+            });
+
             $(document).on('change', '#scrap', function(){
                 if (this.checked) {
                     // Just turn the color of line, not emitting app event
@@ -953,21 +1009,18 @@
                 return false;
             });
             $('form#userSelection').submit(function(event) {
-                socket.emit('userSelection_event', {type: document.getElementById("userSelection").radio.value, name: $('#name').val(), no: Nuser});
+                socket.emit('userSelection_event', {type: document.getElementById("userSelection").radio.value, name: $('#name').val()});
                 return false;
             });
-            $('form#userSelected').submit(function(event) {
-                socket.emit('userSelected_event');
-                return false;
-            });
-            
         });
     </script>
 </head>
 <body>
     <h1>GHG Reduction Simulator</h1>
-    <div id ='comment1'>Choice a role you'll play.</div>
-    <form action="#" id="userSelection" method="POST" placeholder="Message">
+    <div id ='comment1'></div>
+    <div id ='gameSelect'></div>
+    <div id ='userSelection'></div>
+    <!--<form action="#" id="userSelection" method="POST" placeholder="Message">
         <div>
             <label for="ifReg">Regulator : </label>
             <input type="radio" id="ifReg" name="radio" class="radio" value="Regulator">
@@ -988,7 +1041,7 @@
         <div>
             <input type="submit" value="Next">
         </div>
-    </form>
+    </form>-->
     <div id ='userTable'></div>
     <br>
     <div id='regulator'></div>

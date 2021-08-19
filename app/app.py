@@ -73,56 +73,79 @@ regYear = np.linspace(valueDict['regStart'],valueDict['lastYear'],int((valueDict
 
 # prepare fleets
 initialFleets = [parameterFile6,parameterFile7,parameterFile8]
-fleets = {'year': np.zeros(lastYear-startYear+1)}
 
 # prepare regulator decision
-nRegAct = 0
-nRegDec = 0
+nRegAct = {}
+nRegDec = {}
 regDec = rs.regPreFunc(len(regYear)+1)
 
-NshipComp = 0
-Nregulator = 0
-Nuser = 0
+NshipComp = {}
+Nregulator = {}
 userDict = {}
-regulatorIDs = []
-sumCta = 0
+gameDict = {}
+fleets = {}
+regulatorIDs = {}
+sumCta = {}
 figEach = {}
 figTotal = {}
+Ngame = 0
 
 # Routing
 @app.route('/')
 def index():
-    global Nuser
-    Nuser += 1
-    return render_template('userSelection.html', Nuser=Nuser, valueDict=valueDict)
+    return render_template('userSelection.html', valueDict=valueDict)
 
 @socketio.event
-def connect_event(message):
+def connect_event():
     userID = request.sid
     userDict.setdefault(userID,{})
-    userDict[userID]['userNo'] = int(message['no'])
-    userDict[userID]['userType'] = 'Not selected'
-    userDict[userID]['userName'] = 'None'
-    userDict[userID]['elapsedYear'] = 0
-    userDict[userID]['state'] = 'Connected'
+    userDict[userID]['Ngame'] = 0
     global thread
     with thread_lock:
         if thread is None:
             thread = socketio.start_background_task(background_thread)
-    emit('my_response_connect', {'no': message['no']})
+    #emit('my_response_connect')
+
+@socketio.event
+def newGame_event():
+    global Ngame
+    global gameDict
+    global userDict
+    global fleets
+    Ngame += 1
+    fleets.setdefault(Ngame,{})
+    fleets[Ngame]['year'] = np.zeros(lastYear-startYear+1)
+    figEach.setdefault(Ngame,{})
+    figTotal.setdefault(Ngame,{})
+    NshipComp[Ngame] = 0
+    Nregulator[Ngame] = 0
+    sumCta[Ngame] = 0
+    regulatorIDs[Ngame] = []
+    nRegAct[Ngame] = 0
+    nRegDec[Ngame] = 0
+    gameDict.setdefault(Ngame,{})
+    for userID in userDict.keys():
+        if userDict[userID]['Ngame'] == 0:
+            gameDict[Ngame].setdefault(userID,{})
+            gameDict[Ngame][userID]['userNo'] = len(gameDict[Ngame])
+            gameDict[Ngame][userID]['userType'] = 'Not selected'
+            gameDict[Ngame][userID]['userName'] = 'None'
+            gameDict[Ngame][userID]['elapsedYear'] = 0
+            gameDict[Ngame][userID]['state'] = 'Connected'
+    emit('my_response_newGame', broadcast=True)
 
 @socketio.event
 def userSelection_event(message):
+    global Ngame
+    global gameDict
     userID = request.sid
-    userNo = message['no']
+    userNo = gameDict[Ngame][userID]['userNo']
     userType = message['type']
     userName = message['name']
-    userDict[userID]['userNo'] = userNo
-    userDict[userID]['userType'] = userType
-    userDict[userID]['userName'] = userName
-    userDict[userID]['elapsedYear'] = 0
-    userDict[userID]['state'] = 'Selected role'
-    emit('my_response_userTable', {'type': message['type'], 'name': message['name'], 'no': message['no'], 'userDict': json.dumps(userDict,cls=MyEncoder)}, broadcast=True)
+    gameDict[Ngame][userID]['userType'] = userType
+    gameDict[Ngame][userID]['userName'] = userName
+    gameDict[Ngame][userID]['state'] = 'Selected role'
+    emit('my_response_userTable', {'type': message['type'], 'name': message['name'], 'no': userNo, 'gameDict': json.dumps(gameDict[Ngame],cls=MyEncoder)}, broadcast=True)
 
 @socketio.event
 def userSelected_event():
@@ -136,55 +159,57 @@ def userSelected_event():
     global regDec
     global nRegAct
     global nRegDec
+    global Ngame
+    global gameDict
     userID = request.sid
-    userNo = userDict[userID]['userNo']
-    userType = userDict[userID]['userType']
-    userName = userDict[userID]['userName']
-    elapsedYear = userDict[userID]['elapsedYear']
+    userNo = gameDict[Ngame][userID]['userNo']
+    userType = gameDict[Ngame][userID]['userType']
+    userName = gameDict[Ngame][userID]['userName']
+    elapsedYear = gameDict[Ngame][userID]['elapsedYear']
     currentYear = elapsedYear + startYear
-    fleets['year'][elapsedYear] = currentYear
+    fleets[Ngame]['year'][elapsedYear] = currentYear
     if userType == 'Regulator':
-        userDict[userID]['state'] = 'Waiting'
-        if userDict[userID]['elapsedYear'] == 0:
+        gameDict[Ngame][userID]['state'] = 'Waiting'
+        if gameDict[Ngame][userID]['elapsedYear'] == 0:
             join_room('regulator',sid=userID)
-            regulatorIDs.append(userID)
-            Nregulator += 1
-            userDict[userID]['Nregulator'] = Nregulator
-            userDict[userID]['NshipComp'] = 0
-        if currentYear == regYear[nRegAct]:
-            nRegDec += 1
-            emit('my_response_regulator_operation', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': userDict[userID]['elapsedYear'], 'userDict': json.dumps(userDict,cls=MyEncoder), 'regDec': json.dumps(regDec,cls=MyEncoder)})
+            regulatorIDs[Ngame].append(userID)
+            Nregulator[Ngame] += 1
+            gameDict[Ngame][userID]['Nregulator'] = Nregulator[Ngame]
+            gameDict[Ngame][userID]['NshipComp'] = 0
+        if currentYear == regYear[nRegAct[Ngame]]:
+            nRegDec[Ngame] += 1
+            emit('my_response_regulator_operation', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': gameDict[Ngame][userID]['elapsedYear'], 'gameDict': json.dumps(gameDict[Ngame],cls=MyEncoder), 'regDec': json.dumps(regDec,cls=MyEncoder)})
         else:
-            emit('my_response_selected_regulator', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': userDict[userID]['elapsedYear'], 'userDict': json.dumps(userDict,cls=MyEncoder)})
-        if currentYear == regYear[nRegAct]+2:
-            nRegAct += 1
+            emit('my_response_selected_regulator', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': gameDict[Ngame][userID]['elapsedYear'], 'gameDict': json.dumps(gameDict[Ngame],cls=MyEncoder)})
+        if currentYear == regYear[nRegAct[Ngame]]+2:
+            nRegAct[Ngame] += 1
     elif userType == 'Shipping Company':
-        userDict[userID]['state'] = 'Yearly operation'
-        if userDict[userID]['elapsedYear'] == 0:
+        gameDict[Ngame][userID]['state'] = 'Yearly operation'
+        if gameDict[Ngame][userID]['elapsedYear'] == 0:
             join_room('shipComp',sid=userID)
-            NshipComp += 1
-            userDict[userID]['NshipComp'] = NshipComp
-            userDict[userID]['Nregulator'] = 0
-            fleets = rs.fleetPreparationFunc(fleets,np.random.choice(initialFleets),NshipComp,startYear,lastYear,0,tOpSch,tbid,valueDict,NShipFleet,parameterFile2,parameterFile12,parameterFile3,parameterFile5)
-        NshipCompTemp = userDict[userID]['NshipComp']
-        for keyFleet in range(1,len(fleets[NshipCompTemp])):
-            if fleets[NshipCompTemp][keyFleet]['delivery'] <= currentYear and fleets[NshipCompTemp][keyFleet]['tOp'] < tOpSch:
-                tOpTemp = fleets[NshipCompTemp][keyFleet]['tOp']
-                rEEDIreqCurrent = rs.rEEDIreqCurrentFunc(fleets[NshipCompTemp][keyFleet]['wDWT'],regDec['rEEDIreq'][nRegAct])
-                fleets[NshipCompTemp][keyFleet]['EEDIref'][tOpTemp], fleets[NshipCompTemp][keyFleet]['EEDIreq'][tOpTemp] = rs.EEDIreqFunc(valueDict['kEEDI1'],fleets[NshipCompTemp][keyFleet]['wDWT'],valueDict['kEEDI2'],rEEDIreqCurrent)
-                fleets[NshipCompTemp][keyFleet]['MCRM'][tOpTemp], fleets[NshipCompTemp][keyFleet]['PA'][tOpTemp], fleets[NshipCompTemp][keyFleet]['EEDIatt'][tOpTemp], fleets[NshipCompTemp][keyFleet]['vDsgnRed'][tOpTemp] = rs.EEDIattFunc(fleets[NshipCompTemp][keyFleet]['wDWT'],valueDict['wMCR'],valueDict['kMCR1'],valueDict['kMCR2'],valueDict['kMCR3'],valueDict['kPAE1'],valueDict['kPAE2'],valueDict['rCCS'],valueDict['vDsgn'],valueDict['rWPS'],fleets[NshipCompTemp][keyFleet]['Cco2ship'],valueDict['SfcM'],valueDict['SfcA'],valueDict['rSPS'],fleets[NshipCompTemp][keyFleet]['Cco2aux'],fleets[NshipCompTemp][keyFleet]['EEDIreq'][tOpTemp],fleets[NshipCompTemp][keyFleet]['WPS'],fleets[NshipCompTemp][keyFleet]['SPS'],fleets[NshipCompTemp][keyFleet]['CCS'])
-        emit('my_response_selected_shipComp', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': userDict[userID]['elapsedYear'], 'fleets': json.dumps(fleets,cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': userDict[userID]['elapsedYear']+startYear,  'regulatorIDs': json.dumps(regulatorIDs,cls=MyEncoder), 'NshipComp': NshipCompTemp, 'userDict': json.dumps(userDict,cls=MyEncoder)})
+            NshipComp[Ngame] += 1
+            gameDict[Ngame][userID]['NshipComp'] = NshipComp[Ngame]
+            gameDict[Ngame][userID]['Nregulator'] = 0
+            fleets[Ngame] = rs.fleetPreparationFunc(fleets[Ngame],np.random.choice(initialFleets),NshipComp[Ngame],startYear,lastYear,0,tOpSch,tbid,valueDict,NShipFleet,parameterFile2,parameterFile12,parameterFile3,parameterFile5)
+        NshipCompTemp = gameDict[Ngame][userID]['NshipComp']
+        for keyFleet in range(1,len(fleets[Ngame][NshipCompTemp])):
+            if fleets[Ngame][NshipCompTemp][keyFleet]['delivery'] <= currentYear and fleets[Ngame][NshipCompTemp][keyFleet]['tOp'] < tOpSch:
+                tOpTemp = fleets[Ngame][NshipCompTemp][keyFleet]['tOp']
+                rEEDIreqCurrent = rs.rEEDIreqCurrentFunc(fleets[Ngame][NshipCompTemp][keyFleet]['wDWT'],regDec['rEEDIreq'][nRegAct[Ngame]])
+                fleets[Ngame][NshipCompTemp][keyFleet]['EEDIref'][tOpTemp], fleets[Ngame][NshipCompTemp][keyFleet]['EEDIreq'][tOpTemp] = rs.EEDIreqFunc(valueDict['kEEDI1'],fleets[Ngame][NshipCompTemp][keyFleet]['wDWT'],valueDict['kEEDI2'],rEEDIreqCurrent)
+                fleets[Ngame][NshipCompTemp][keyFleet]['MCRM'][tOpTemp], fleets[Ngame][NshipCompTemp][keyFleet]['PA'][tOpTemp], fleets[Ngame][NshipCompTemp][keyFleet]['EEDIatt'][tOpTemp], fleets[Ngame][NshipCompTemp][keyFleet]['vDsgnRed'][tOpTemp] = rs.EEDIattFunc(fleets[Ngame][NshipCompTemp][keyFleet]['wDWT'],valueDict['wMCR'],valueDict['kMCR1'],valueDict['kMCR2'],valueDict['kMCR3'],valueDict['kPAE1'],valueDict['kPAE2'],valueDict['rCCS'],valueDict['vDsgn'],valueDict['rWPS'],fleets[Ngame][NshipCompTemp][keyFleet]['Cco2ship'],valueDict['SfcM'],valueDict['SfcA'],valueDict['rSPS'],fleets[Ngame][NshipCompTemp][keyFleet]['Cco2aux'],fleets[Ngame][NshipCompTemp][keyFleet]['EEDIreq'][tOpTemp],fleets[Ngame][NshipCompTemp][keyFleet]['WPS'],fleets[Ngame][NshipCompTemp][keyFleet]['SPS'],fleets[Ngame][NshipCompTemp][keyFleet]['CCS'])
+        emit('my_response_selected_shipComp', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': gameDict[Ngame][userID]['elapsedYear'], 'fleets': json.dumps(fleets[Ngame],cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': gameDict[Ngame][userID]['elapsedYear']+startYear,  'regulatorIDs': json.dumps(regulatorIDs[Ngame],cls=MyEncoder), 'NshipComp': NshipCompTemp, 'gameDict': json.dumps(gameDict[Ngame],cls=MyEncoder)})
     
 #emit('redirect',{url_for()})
 @socketio.event
 def regulatorOperation_event(message):
     global nRegAct
     global nRegDec
-    regDec['rEEDIreq'][nRegDec,0] = float(message['rEEDIreq1']) / 100
-    regDec['rEEDIreq'][nRegDec,1] = float(message['rEEDIreq2']) / 100
-    regDec['rEEDIreq'][nRegDec,2] = float(message['rEEDIreq3']) / 100
-    regDec['Subsidy'][nRegDec] = float(message['Subsidy']) / 100
-    regDec['Ctax'][nRegDec] = float(message['Ctax'])
+    regDec['rEEDIreq'][nRegDec[Ngame],0] = float(message['rEEDIreq1']) / 100
+    regDec['rEEDIreq'][nRegDec[Ngame],1] = float(message['rEEDIreq2']) / 100
+    regDec['rEEDIreq'][nRegDec[Ngame],2] = float(message['rEEDIreq3']) / 100
+    regDec['Subsidy'][nRegDec[Ngame]] = float(message['Subsidy']) / 100
+    regDec['Ctax'][nRegDec[Ngame]] = float(message['Ctax'])
 
 @socketio.event
 def cbs_event(message):
@@ -196,22 +221,24 @@ def cbs_event(message):
     global regulatorIDs
     global regDec
     global nRegAct
+    global Ngame
+    global gameDict
     userID = request.sid
-    userNo = userDict[userID]['userNo']
-    userType = userDict[userID]['userType']
-    userName = userDict[userID]['userName']
-    NshipComp = userDict[userID]['NshipComp']
-    currentYear = userDict[userID]['elapsedYear'] + startYear
-    for keyFleet in range(1,len(fleets[NshipComp])):
-        if fleets[NshipComp][keyFleet]['delivery'] <= currentYear and fleets[NshipComp][keyFleet]['tOp'] < tOpSch:
-            fleets[NshipComp][keyFleet]['WPS'] = message[str(keyFleet)]['WPS']
-            fleets[NshipComp][keyFleet]['SPS'] = message[str(keyFleet)]['SPS']
-            fleets[NshipComp][keyFleet]['CCS'] = message[str(keyFleet)]['CCS']
-            tOpTemp = fleets[NshipComp][keyFleet]['tOp']
-            rEEDIreqCurrent = rs.rEEDIreqCurrentFunc(fleets[NshipComp][keyFleet]['wDWT'],regDec['rEEDIreq'][nRegAct])
-            fleets[NshipComp][keyFleet]['EEDIref'][tOpTemp], fleets[NshipComp][keyFleet]['EEDIreq'][tOpTemp] = rs.EEDIreqFunc(valueDict['kEEDI1'],fleets[NshipComp][keyFleet]['wDWT'],valueDict['kEEDI2'],rEEDIreqCurrent)
-            fleets[NshipComp][keyFleet]['MCRM'][tOpTemp], fleets[NshipComp][keyFleet]['PA'][tOpTemp], fleets[NshipComp][keyFleet]['EEDIatt'][tOpTemp], fleets[NshipComp][keyFleet]['vDsgnRed'][tOpTemp] = rs.EEDIattFunc(fleets[NshipComp][keyFleet]['wDWT'],valueDict['wMCR'],valueDict['kMCR1'],valueDict['kMCR2'],valueDict['kMCR3'],valueDict['kPAE1'],valueDict['kPAE2'],valueDict['rCCS'],valueDict['vDsgn'],valueDict['rWPS'],fleets[NshipComp][keyFleet]['Cco2ship'],valueDict['SfcM'],valueDict['SfcA'],valueDict['rSPS'],fleets[NshipComp][keyFleet]['Cco2aux'],fleets[NshipComp][keyFleet]['EEDIreq'][tOpTemp],fleets[NshipComp][keyFleet]['WPS'],fleets[NshipComp][keyFleet]['SPS'],fleets[NshipComp][keyFleet]['CCS'])
-    emit('my_response_refurbish', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': userDict[userID]['elapsedYear'], 'fleets': json.dumps(fleets,cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': userDict[userID]['elapsedYear']+startYear,  'regulatorIDs': json.dumps(regulatorIDs,cls=MyEncoder), 'NshipComp': NshipComp})
+    userNo = gameDict[Ngame][userID]['userNo']
+    userType = gameDict[Ngame][userID]['userType']
+    userName = gameDict[Ngame][userID]['userName']
+    NshipComp = gameDict[Ngame][userID]['NshipComp']
+    currentYear = gameDict[Ngame][userID]['elapsedYear'] + startYear
+    for keyFleet in range(1,len(fleets[Ngame][NshipComp])):
+        if fleets[Ngame][NshipComp][keyFleet]['delivery'] <= currentYear and fleets[Ngame][NshipComp][keyFleet]['tOp'] < tOpSch:
+            fleets[Ngame][NshipComp][keyFleet]['WPS'] = message[str(keyFleet)]['WPS']
+            fleets[Ngame][NshipComp][keyFleet]['SPS'] = message[str(keyFleet)]['SPS']
+            fleets[Ngame][NshipComp][keyFleet]['CCS'] = message[str(keyFleet)]['CCS']
+            tOpTemp = fleets[Ngame][NshipComp][keyFleet]['tOp']
+            rEEDIreqCurrent = rs.rEEDIreqCurrentFunc(fleets[Ngame][NshipComp][keyFleet]['wDWT'],regDec['rEEDIreq'][nRegAct[Ngame]])
+            fleets[Ngame][NshipComp][keyFleet]['EEDIref'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['EEDIreq'][tOpTemp] = rs.EEDIreqFunc(valueDict['kEEDI1'],fleets[Ngame][NshipComp][keyFleet]['wDWT'],valueDict['kEEDI2'],rEEDIreqCurrent)
+            fleets[Ngame][NshipComp][keyFleet]['MCRM'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['PA'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['EEDIatt'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['vDsgnRed'][tOpTemp] = rs.EEDIattFunc(fleets[Ngame][NshipComp][keyFleet]['wDWT'],valueDict['wMCR'],valueDict['kMCR1'],valueDict['kMCR2'],valueDict['kMCR3'],valueDict['kPAE1'],valueDict['kPAE2'],valueDict['rCCS'],valueDict['vDsgn'],valueDict['rWPS'],fleets[Ngame][NshipComp][keyFleet]['Cco2ship'],valueDict['SfcM'],valueDict['SfcA'],valueDict['rSPS'],fleets[Ngame][NshipComp][keyFleet]['Cco2aux'],fleets[Ngame][NshipComp][keyFleet]['EEDIreq'][tOpTemp],fleets[Ngame][NshipComp][keyFleet]['WPS'],fleets[Ngame][NshipComp][keyFleet]['SPS'],fleets[Ngame][NshipComp][keyFleet]['CCS'])
+    emit('my_response_refurbish', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': gameDict[Ngame][userID]['elapsedYear'], 'fleets': json.dumps(fleets[Ngame],cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': gameDict[Ngame][userID]['elapsedYear']+startYear,  'regulatorIDs': json.dumps(regulatorIDs[Ngame],cls=MyEncoder), 'NshipComp': NshipComp})
 
 @socketio.event
 def orderChange_event(fuelTypeDict,CAPcntDict,sysDict):
@@ -223,6 +250,8 @@ def orderChange_event(fuelTypeDict,CAPcntDict,sysDict):
     global regulatorIDs
     global regDec
     global nRegAct
+    global Ngame
+    global gameDict
     orderList = {}
     for keyFleet in range(1,len(sysDict)+1):
         if fuelTypeDict[str(keyFleet)] == 'HFO/Diesel':
@@ -232,7 +261,7 @@ def orderChange_event(fuelTypeDict,CAPcntDict,sysDict):
             Cco2ship = rs.Cco2Func(parameterFile3,fuelTypeDict[str(keyFleet)])
             Cco2aux = rs.Cco2Func(parameterFile3,fuelTypeDict[str(keyFleet)])
         wDWT = rs.wDWTFunc(valueDict['kDWT1'],float(CAPcntDict[str(keyFleet)]),valueDict['kDWT2'])
-        rEEDIreqCurrent = rs.rEEDIreqCurrentFunc(wDWT,regDec['rEEDIreq'][nRegAct])
+        rEEDIreqCurrent = rs.rEEDIreqCurrentFunc(wDWT,regDec['rEEDIreq'][nRegAct[Ngame]])
         EEDIref, EEDIreq = rs.EEDIreqFunc(valueDict['kEEDI1'],wDWT,valueDict['kEEDI2'],rEEDIreqCurrent)
         _, _, EEDIatt, vDsgnRed = rs.EEDIattFunc(wDWT,valueDict['wMCR'],valueDict['kMCR1'],valueDict['kMCR2'],valueDict['kMCR3'],valueDict['kPAE1'],valueDict['kPAE2'],valueDict['rCCS'],valueDict['vDsgn'],valueDict['rWPS'],Cco2ship,valueDict['SfcM'],valueDict['SfcA'],valueDict['rSPS'],Cco2aux,EEDIreq,int(sysDict[str(keyFleet)]['WPS']),int(sysDict[str(keyFleet)]['SPS']),int(sysDict[str(keyFleet)]['CCS']))
         orderList.setdefault(keyFleet,{})
@@ -251,12 +280,14 @@ def scrap_event(message):
     global regulatorIDs
     global regDec
     global nRegAct
+    global Ngame
+    global gameDict
     userID = request.sid
-    userNo = userDict[userID]['userNo']
-    userType = userDict[userID]['userType']
-    userName = userDict[userID]['userName']
-    NshipComp = userDict[userID]['NshipComp']
-    emit('my_response_scrap', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': userDict[userID]['elapsedYear'], 'fleets': json.dumps(fleets,cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': userDict[userID]['elapsedYear']+startYear,  'regulatorIDs': json.dumps(regulatorIDs,cls=MyEncoder), 'ifScrap': message['val'], 'NshipComp': NshipComp})
+    userNo = gameDict[Ngame][userID]['userNo']
+    userType = gameDict[Ngame][userID]['userType']
+    userName = gameDict[Ngame][userID]['userName']
+    NshipComp = gameDict[Ngame][userID]['NshipComp']
+    emit('my_response_scrap', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': gameDict[Ngame][userID]['elapsedYear'], 'fleets': json.dumps(fleets[Ngame],cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': gameDict[Ngame][userID]['elapsedYear']+startYear,  'regulatorIDs': json.dumps(regulatorIDs[Ngame],cls=MyEncoder), 'ifScrap': message['val'], 'NshipComp': NshipComp})
 
 @socketio.event
 def wpsAtOnce_event(message):
@@ -268,22 +299,24 @@ def wpsAtOnce_event(message):
     global regulatorIDs
     global regDec
     global nRegAct
+    global Ngame
+    global gameDict
     userID = request.sid
-    userNo = userDict[userID]['userNo']
-    userType = userDict[userID]['userType']
-    userName = userDict[userID]['userName']
-    NshipComp = userDict[userID]['NshipComp']
-    currentYear = userDict[userID]['elapsedYear'] + startYear
-    for keyFleet in range(1,len(fleets[NshipComp])):
-        if fleets[NshipComp][keyFleet]['delivery'] <= currentYear and fleets[NshipComp][keyFleet]['tOp'] < tOpSch:
-            fleets[NshipComp][keyFleet]['WPS'] = message[str(keyFleet)]['WPS']
-            fleets[NshipComp][keyFleet]['SPS'] = message[str(keyFleet)]['SPS']
-            fleets[NshipComp][keyFleet]['CCS'] = message[str(keyFleet)]['CCS']
-            tOpTemp = fleets[NshipComp][keyFleet]['tOp']
-            rEEDIreqCurrent = rs.rEEDIreqCurrentFunc(fleets[NshipComp][keyFleet]['wDWT'],regDec['rEEDIreq'][nRegAct])
-            fleets[NshipComp][keyFleet]['EEDIref'][tOpTemp], fleets[NshipComp][keyFleet]['EEDIreq'][tOpTemp] = rs.EEDIreqFunc(valueDict['kEEDI1'],fleets[NshipComp][keyFleet]['wDWT'],valueDict['kEEDI2'],rEEDIreqCurrent)
-            fleets[NshipComp][keyFleet]['MCRM'][tOpTemp], fleets[NshipComp][keyFleet]['PA'][tOpTemp], fleets[NshipComp][keyFleet]['EEDIatt'][tOpTemp], fleets[NshipComp][keyFleet]['vDsgnRed'][tOpTemp] = rs.EEDIattFunc(fleets[NshipComp][keyFleet]['wDWT'],valueDict['wMCR'],valueDict['kMCR1'],valueDict['kMCR2'],valueDict['kMCR3'],valueDict['kPAE1'],valueDict['kPAE2'],valueDict['rCCS'],valueDict['vDsgn'],valueDict['rWPS'],fleets[NshipComp][keyFleet]['Cco2ship'],valueDict['SfcM'],valueDict['SfcA'],valueDict['rSPS'],fleets[NshipComp][keyFleet]['Cco2aux'],fleets[NshipComp][keyFleet]['EEDIreq'][tOpTemp],fleets[NshipComp][keyFleet]['WPS'],fleets[NshipComp][keyFleet]['SPS'],fleets[NshipComp][keyFleet]['CCS'])
-    emit('my_response_refurbish', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': userDict[userID]['elapsedYear'], 'fleets': json.dumps(fleets,cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': userDict[userID]['elapsedYear']+startYear,  'regulatorIDs': json.dumps(regulatorIDs,cls=MyEncoder), 'NshipComp': NshipComp})
+    userNo = gameDict[Ngame][userID]['userNo']
+    userType = gameDict[Ngame][userID]['userType']
+    userName = gameDict[Ngame][userID]['userName']
+    NshipComp = gameDict[Ngame][userID]['NshipComp']
+    currentYear = gameDict[Ngame][userID]['elapsedYear'] + startYear
+    for keyFleet in range(1,len(fleets[Ngame][NshipComp])):
+        if fleets[Ngame][NshipComp][keyFleet]['delivery'] <= currentYear and fleets[Ngame][NshipComp][keyFleet]['tOp'] < tOpSch:
+            fleets[Ngame][NshipComp][keyFleet]['WPS'] = message[str(keyFleet)]['WPS']
+            fleets[Ngame][NshipComp][keyFleet]['SPS'] = message[str(keyFleet)]['SPS']
+            fleets[Ngame][NshipComp][keyFleet]['CCS'] = message[str(keyFleet)]['CCS']
+            tOpTemp = fleets[Ngame][NshipComp][keyFleet]['tOp']
+            rEEDIreqCurrent = rs.rEEDIreqCurrentFunc(fleets[Ngame][NshipComp][keyFleet]['wDWT'],regDec['rEEDIreq'][nRegAct[Ngame]])
+            fleets[Ngame][NshipComp][keyFleet]['EEDIref'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['EEDIreq'][tOpTemp] = rs.EEDIreqFunc(valueDict['kEEDI1'],fleets[Ngame][NshipComp][keyFleet]['wDWT'],valueDict['kEEDI2'],rEEDIreqCurrent)
+            fleets[Ngame][NshipComp][keyFleet]['MCRM'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['PA'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['EEDIatt'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['vDsgnRed'][tOpTemp] = rs.EEDIattFunc(fleets[Ngame][NshipComp][keyFleet]['wDWT'],valueDict['wMCR'],valueDict['kMCR1'],valueDict['kMCR2'],valueDict['kMCR3'],valueDict['kPAE1'],valueDict['kPAE2'],valueDict['rCCS'],valueDict['vDsgn'],valueDict['rWPS'],fleets[Ngame][NshipComp][keyFleet]['Cco2ship'],valueDict['SfcM'],valueDict['SfcA'],valueDict['rSPS'],fleets[Ngame][NshipComp][keyFleet]['Cco2aux'],fleets[Ngame][NshipComp][keyFleet]['EEDIreq'][tOpTemp],fleets[Ngame][NshipComp][keyFleet]['WPS'],fleets[Ngame][NshipComp][keyFleet]['SPS'],fleets[Ngame][NshipComp][keyFleet]['CCS'])
+    emit('my_response_refurbish', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': gameDict[Ngame][userID]['elapsedYear'], 'fleets': json.dumps(fleets[Ngame],cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': gameDict[Ngame][userID]['elapsedYear']+startYear,  'regulatorIDs': json.dumps(regulatorIDs[Ngame],cls=MyEncoder), 'NshipComp': NshipComp})
 
 @socketio.event
 def spsAtOnce_event(message):
@@ -295,22 +328,24 @@ def spsAtOnce_event(message):
     global regulatorIDs
     global regDec
     global nRegAct
+    global Ngame
+    global gameDict
     userID = request.sid
-    userNo = userDict[userID]['userNo']
-    userType = userDict[userID]['userType']
-    userName = userDict[userID]['userName']
-    NshipComp = userDict[userID]['NshipComp']
-    currentYear = userDict[userID]['elapsedYear'] + startYear
-    for keyFleet in range(1,len(fleets[NshipComp])):
-        if fleets[NshipComp][keyFleet]['delivery'] <= currentYear and fleets[NshipComp][keyFleet]['tOp'] < tOpSch:
-            fleets[NshipComp][keyFleet]['WPS'] = message[str(keyFleet)]['WPS']
-            fleets[NshipComp][keyFleet]['SPS'] = message[str(keyFleet)]['SPS']
-            fleets[NshipComp][keyFleet]['CCS'] = message[str(keyFleet)]['CCS']
-            tOpTemp = fleets[NshipComp][keyFleet]['tOp']
-            rEEDIreqCurrent = rs.rEEDIreqCurrentFunc(fleets[NshipComp][keyFleet]['wDWT'],regDec['rEEDIreq'][nRegAct])
-            fleets[NshipComp][keyFleet]['EEDIref'][tOpTemp], fleets[NshipComp][keyFleet]['EEDIreq'][tOpTemp] = rs.EEDIreqFunc(valueDict['kEEDI1'],fleets[NshipComp][keyFleet]['wDWT'],valueDict['kEEDI2'],rEEDIreqCurrent)
-            fleets[NshipComp][keyFleet]['MCRM'][tOpTemp], fleets[NshipComp][keyFleet]['PA'][tOpTemp], fleets[NshipComp][keyFleet]['EEDIatt'][tOpTemp], fleets[NshipComp][keyFleet]['vDsgnRed'][tOpTemp] = rs.EEDIattFunc(fleets[NshipComp][keyFleet]['wDWT'],valueDict['wMCR'],valueDict['kMCR1'],valueDict['kMCR2'],valueDict['kMCR3'],valueDict['kPAE1'],valueDict['kPAE2'],valueDict['rCCS'],valueDict['vDsgn'],valueDict['rWPS'],fleets[NshipComp][keyFleet]['Cco2ship'],valueDict['SfcM'],valueDict['SfcA'],valueDict['rSPS'],fleets[NshipComp][keyFleet]['Cco2aux'],fleets[NshipComp][keyFleet]['EEDIreq'][tOpTemp],fleets[NshipComp][keyFleet]['WPS'],fleets[NshipComp][keyFleet]['SPS'],fleets[NshipComp][keyFleet]['CCS'])
-    emit('my_response_refurbish', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': userDict[userID]['elapsedYear'], 'fleets': json.dumps(fleets,cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': userDict[userID]['elapsedYear']+startYear,  'regulatorIDs': json.dumps(regulatorIDs,cls=MyEncoder), 'NshipComp': NshipComp})
+    userNo = gameDict[Ngame][userID]['userNo']
+    userType = gameDict[Ngame][userID]['userType']
+    userName = gameDict[Ngame][userID]['userName']
+    NshipComp = gameDict[Ngame][userID]['NshipComp']
+    currentYear = gameDict[Ngame][userID]['elapsedYear'] + startYear
+    for keyFleet in range(1,len(fleets[Ngame][NshipComp])):
+        if fleets[Ngame][NshipComp][keyFleet]['delivery'] <= currentYear and fleets[Ngame][NshipComp][keyFleet]['tOp'] < tOpSch:
+            fleets[Ngame][NshipComp][keyFleet]['WPS'] = message[str(keyFleet)]['WPS']
+            fleets[Ngame][NshipComp][keyFleet]['SPS'] = message[str(keyFleet)]['SPS']
+            fleets[Ngame][NshipComp][keyFleet]['CCS'] = message[str(keyFleet)]['CCS']
+            tOpTemp = fleets[Ngame][NshipComp][keyFleet]['tOp']
+            rEEDIreqCurrent = rs.rEEDIreqCurrentFunc(fleets[Ngame][NshipComp][keyFleet]['wDWT'],regDec['rEEDIreq'][nRegAct[Ngame]])
+            fleets[Ngame][NshipComp][keyFleet]['EEDIref'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['EEDIreq'][tOpTemp] = rs.EEDIreqFunc(valueDict['kEEDI1'],fleets[Ngame][NshipComp][keyFleet]['wDWT'],valueDict['kEEDI2'],rEEDIreqCurrent)
+            fleets[Ngame][NshipComp][keyFleet]['MCRM'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['PA'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['EEDIatt'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['vDsgnRed'][tOpTemp] = rs.EEDIattFunc(fleets[Ngame][NshipComp][keyFleet]['wDWT'],valueDict['wMCR'],valueDict['kMCR1'],valueDict['kMCR2'],valueDict['kMCR3'],valueDict['kPAE1'],valueDict['kPAE2'],valueDict['rCCS'],valueDict['vDsgn'],valueDict['rWPS'],fleets[Ngame][NshipComp][keyFleet]['Cco2ship'],valueDict['SfcM'],valueDict['SfcA'],valueDict['rSPS'],fleets[Ngame][NshipComp][keyFleet]['Cco2aux'],fleets[Ngame][NshipComp][keyFleet]['EEDIreq'][tOpTemp],fleets[Ngame][NshipComp][keyFleet]['WPS'],fleets[Ngame][NshipComp][keyFleet]['SPS'],fleets[Ngame][NshipComp][keyFleet]['CCS'])
+    emit('my_response_refurbish', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': gameDict[Ngame][userID]['elapsedYear'], 'fleets': json.dumps(fleets[Ngame],cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': gameDict[Ngame][userID]['elapsedYear']+startYear,  'regulatorIDs': json.dumps(regulatorIDs[Ngame],cls=MyEncoder), 'NshipComp': NshipComp})
 
 @socketio.event
 def ccsAtOnce_event(message):
@@ -322,22 +357,24 @@ def ccsAtOnce_event(message):
     global regulatorIDs
     global regDec
     global nRegAct
+    global Ngame
+    global gameDict
     userID = request.sid
-    userNo = userDict[userID]['userNo']
-    userType = userDict[userID]['userType']
-    userName = userDict[userID]['userName']
-    NshipComp = userDict[userID]['NshipComp']
-    currentYear = userDict[userID]['elapsedYear'] + startYear
-    for keyFleet in range(1,len(fleets[NshipComp])):
-        if fleets[NshipComp][keyFleet]['delivery'] <= currentYear and fleets[NshipComp][keyFleet]['tOp'] < tOpSch:
-            fleets[NshipComp][keyFleet]['WPS'] = message[str(keyFleet)]['WPS']
-            fleets[NshipComp][keyFleet]['SPS'] = message[str(keyFleet)]['SPS']
-            fleets[NshipComp][keyFleet]['CCS'] = message[str(keyFleet)]['CCS']
-            tOpTemp = fleets[NshipComp][keyFleet]['tOp']
-            rEEDIreqCurrent = rs.rEEDIreqCurrentFunc(fleets[NshipComp][keyFleet]['wDWT'],regDec['rEEDIreq'][nRegAct])
-            fleets[NshipComp][keyFleet]['EEDIref'][tOpTemp], fleets[NshipComp][keyFleet]['EEDIreq'][tOpTemp] = rs.EEDIreqFunc(valueDict['kEEDI1'],fleets[NshipComp][keyFleet]['wDWT'],valueDict['kEEDI2'],rEEDIreqCurrent)
-            fleets[NshipComp][keyFleet]['MCRM'][tOpTemp], fleets[NshipComp][keyFleet]['PA'][tOpTemp], fleets[NshipComp][keyFleet]['EEDIatt'][tOpTemp], fleets[NshipComp][keyFleet]['vDsgnRed'][tOpTemp] = rs.EEDIattFunc(fleets[NshipComp][keyFleet]['wDWT'],valueDict['wMCR'],valueDict['kMCR1'],valueDict['kMCR2'],valueDict['kMCR3'],valueDict['kPAE1'],valueDict['kPAE2'],valueDict['rCCS'],valueDict['vDsgn'],valueDict['rWPS'],fleets[NshipComp][keyFleet]['Cco2ship'],valueDict['SfcM'],valueDict['SfcA'],valueDict['rSPS'],fleets[NshipComp][keyFleet]['Cco2aux'],fleets[NshipComp][keyFleet]['EEDIreq'][tOpTemp],fleets[NshipComp][keyFleet]['WPS'],fleets[NshipComp][keyFleet]['SPS'],fleets[NshipComp][keyFleet]['CCS'])
-    emit('my_response_refurbish', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': userDict[userID]['elapsedYear'], 'fleets': json.dumps(fleets,cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': userDict[userID]['elapsedYear']+startYear,  'regulatorIDs': json.dumps(regulatorIDs,cls=MyEncoder), 'NshipComp': NshipComp})
+    userNo = gameDict[Ngame][userID]['userNo']
+    userType = gameDict[Ngame][userID]['userType']
+    userName = gameDict[Ngame][userID]['userName']
+    NshipComp = gameDict[Ngame][userID]['NshipComp']
+    currentYear = gameDict[Ngame][userID]['elapsedYear'] + startYear
+    for keyFleet in range(1,len(fleets[Ngame][NshipComp])):
+        if fleets[Ngame][NshipComp][keyFleet]['delivery'] <= currentYear and fleets[Ngame][NshipComp][keyFleet]['tOp'] < tOpSch:
+            fleets[Ngame][NshipComp][keyFleet]['WPS'] = message[str(keyFleet)]['WPS']
+            fleets[Ngame][NshipComp][keyFleet]['SPS'] = message[str(keyFleet)]['SPS']
+            fleets[Ngame][NshipComp][keyFleet]['CCS'] = message[str(keyFleet)]['CCS']
+            tOpTemp = fleets[Ngame][NshipComp][keyFleet]['tOp']
+            rEEDIreqCurrent = rs.rEEDIreqCurrentFunc(fleets[Ngame][NshipComp][keyFleet]['wDWT'],regDec['rEEDIreq'][nRegAct[Ngame]])
+            fleets[Ngame][NshipComp][keyFleet]['EEDIref'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['EEDIreq'][tOpTemp] = rs.EEDIreqFunc(valueDict['kEEDI1'],fleets[Ngame][NshipComp][keyFleet]['wDWT'],valueDict['kEEDI2'],rEEDIreqCurrent)
+            fleets[Ngame][NshipComp][keyFleet]['MCRM'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['PA'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['EEDIatt'][tOpTemp], fleets[Ngame][NshipComp][keyFleet]['vDsgnRed'][tOpTemp] = rs.EEDIattFunc(fleets[Ngame][NshipComp][keyFleet]['wDWT'],valueDict['wMCR'],valueDict['kMCR1'],valueDict['kMCR2'],valueDict['kMCR3'],valueDict['kPAE1'],valueDict['kPAE2'],valueDict['rCCS'],valueDict['vDsgn'],valueDict['rWPS'],fleets[Ngame][NshipComp][keyFleet]['Cco2ship'],valueDict['SfcM'],valueDict['SfcA'],valueDict['rSPS'],fleets[Ngame][NshipComp][keyFleet]['Cco2aux'],fleets[Ngame][NshipComp][keyFleet]['EEDIreq'][tOpTemp],fleets[Ngame][NshipComp][keyFleet]['WPS'],fleets[Ngame][NshipComp][keyFleet]['SPS'],fleets[Ngame][NshipComp][keyFleet]['CCS'])
+    emit('my_response_refurbish', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': gameDict[Ngame][userID]['elapsedYear'], 'fleets': json.dumps(fleets[Ngame],cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': gameDict[Ngame][userID]['elapsedYear']+startYear,  'regulatorIDs': json.dumps(regulatorIDs[Ngame],cls=MyEncoder), 'NshipComp': NshipComp})
 
 @socketio.event
 def speedAtOnce_event(message):
@@ -349,12 +386,14 @@ def speedAtOnce_event(message):
     global regulatorIDs
     global regDec
     global nRegAct
+    global Ngame
+    global gameDict
     userID = request.sid
-    userNo = userDict[userID]['userNo']
-    userType = userDict[userID]['userType']
-    userName = userDict[userID]['userName']
-    NshipComp = userDict[userID]['NshipComp']
-    emit('my_response_speedAtOnce', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': userDict[userID]['elapsedYear'], 'fleets': json.dumps(fleets,cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': userDict[userID]['elapsedYear']+startYear,  'regulatorIDs': json.dumps(regulatorIDs,cls=MyEncoder), 'speed': message['val'], 'NshipComp': NshipComp})
+    userNo = gameDict[Ngame][userID]['userNo']
+    userType = gameDict[Ngame][userID]['userType']
+    userName = gameDict[Ngame][userID]['userName']
+    NshipComp = gameDict[Ngame][userID]['NshipComp']
+    emit('my_response_speedAtOnce', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': gameDict[Ngame][userID]['elapsedYear'], 'fleets': json.dumps(fleets[Ngame],cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': gameDict[Ngame][userID]['elapsedYear']+startYear,  'regulatorIDs': json.dumps(regulatorIDs[Ngame],cls=MyEncoder), 'speed': message['val'], 'NshipComp': NshipComp})
 
 @socketio.event
 def orderList_event(message):
@@ -366,11 +405,13 @@ def orderList_event(message):
     global regulatorIDs
     global regDec
     global nRegAct
+    global Ngame
+    global gameDict
     userID = request.sid
-    userNo = userDict[userID]['userNo']
-    userType = userDict[userID]['userType']
-    userName = userDict[userID]['userName']
-    NshipComp = userDict[userID]['NshipComp']
+    userNo = gameDict[Ngame][userID]['userNo']
+    userType = gameDict[Ngame][userID]['userType']
+    userName = gameDict[Ngame][userID]['userName']
+    NshipComp = gameDict[Ngame][userID]['NshipComp']
     if message['fuelType'] == 'HFO/Diesel':
         Cco2ship = rs.Cco2Func(parameterFile3,'HFO')
         Cco2aux = rs.Cco2Func(parameterFile3,'Diesel')
@@ -378,10 +419,10 @@ def orderList_event(message):
         Cco2ship = rs.Cco2Func(parameterFile3,message['fuelType'])
         Cco2aux = rs.Cco2Func(parameterFile3,message['fuelType'])
     wDWT = rs.wDWTFunc(valueDict['kDWT1'],float(message['CAPcnt']),valueDict['kDWT2'])
-    rEEDIreqCurrent = rs.rEEDIreqCurrentFunc(wDWT,regDec['rEEDIreq'][nRegAct])
+    rEEDIreqCurrent = rs.rEEDIreqCurrentFunc(wDWT,regDec['rEEDIreq'][nRegAct[Ngame]])
     EEDIref, EEDIreq = rs.EEDIreqFunc(valueDict['kEEDI1'],wDWT,valueDict['kEEDI2'],rEEDIreqCurrent)
     _, _, EEDIatt, vDsgnRed = rs.EEDIattFunc(wDWT,valueDict['wMCR'],valueDict['kMCR1'],valueDict['kMCR2'],valueDict['kMCR3'],valueDict['kPAE1'],valueDict['kPAE2'],valueDict['rCCS'],valueDict['vDsgn'],valueDict['rWPS'],Cco2ship,valueDict['SfcM'],valueDict['SfcA'],valueDict['rSPS'],Cco2aux,EEDIreq,int(message['WPS']),int(message['SPS']),int(message['CCS']))
-    emit('my_response_orderList', {'vDsgnRed': vDsgnRed, 'EEDIreq': EEDIreq, 'EEDIatt': EEDIatt, 'keyFleet': message['keyFleet'], 'currentYear': userDict[userID]['elapsedYear']+startYear})
+    emit('my_response_orderList', {'vDsgnRed': vDsgnRed, 'EEDIreq': EEDIreq, 'EEDIatt': EEDIatt, 'keyFleet': message['keyFleet'], 'currentYear': gameDict[Ngame][userID]['elapsedYear']+startYear})
 
 @socketio.event
 def nextYear_event(fleetDict, orderDict):
@@ -394,33 +435,35 @@ def nextYear_event(fleetDict, orderDict):
     global regDec
     global nRegAct
     global sumCta
+    global Ngame
+    global gameDict
     userID = request.sid
-    userNo = userDict[userID]['userNo']
-    userType = userDict[userID]['userType']
-    userName = userDict[userID]['userName']
-    NshipComp = userDict[userID]['NshipComp']
-    elapsedYear = userDict[userID]['elapsedYear']
-    userDict[userID]['state'] = 'Viewing results'
+    userNo = gameDict[Ngame][userID]['userNo']
+    userType = gameDict[Ngame][userID]['userType']
+    userName = gameDict[Ngame][userID]['userName']
+    NshipComp = gameDict[Ngame][userID]['NshipComp']
+    elapsedYear = gameDict[Ngame][userID]['elapsedYear']
+    gameDict[Ngame][userID]['state'] = 'Waiting results'
     maxCta = 0
     currentYear = elapsedYear + startYear
-    for keyFleet in range(1,len(fleets[NshipComp])):
-        if fleets[NshipComp][keyFleet]['delivery'] <= currentYear and fleets[NshipComp][keyFleet]['tOp'] < tOpSch:
+    for keyFleet in range(1,len(fleets[Ngame][NshipComp])):
+        if fleets[Ngame][NshipComp][keyFleet]['delivery'] <= currentYear and fleets[Ngame][NshipComp][keyFleet]['tOp'] < tOpSch:
             if int(fleetDict[str(keyFleet)]['scrap']):
-                fleets[NshipComp][keyFleet]['tOp'] = tOpSch
+                fleets[Ngame][NshipComp][keyFleet]['tOp'] = tOpSch
             else:
-                tOpTemp = fleets[NshipComp][keyFleet]['tOp']
-                fleets[NshipComp][keyFleet]['v'][tOpTemp] = fleetDict[str(keyFleet)]['speed']
-                fleets[NshipComp][keyFleet]['d'][tOpTemp] = rs.dFunc(valueDict["Dyear"],valueDict["Hday"],fleets[NshipComp][keyFleet]['v'][tOpTemp],valueDict["Rrun"])
-                maxCta += NShipFleet * rs.maxCtaFunc(fleets[NshipComp][keyFleet]['CAPcnt'],fleets[NshipComp][keyFleet]['d'][tOpTemp])
-    fleets[NshipComp]['total']['maxCta'][elapsedYear] = maxCta
-    sumCta += maxCta
+                tOpTemp = fleets[Ngame][NshipComp][keyFleet]['tOp']
+                fleets[Ngame][NshipComp][keyFleet]['v'][tOpTemp] = fleetDict[str(keyFleet)]['speed']
+                fleets[Ngame][NshipComp][keyFleet]['d'][tOpTemp] = rs.dFunc(valueDict["Dyear"],valueDict["Hday"],fleets[Ngame][NshipComp][keyFleet]['v'][tOpTemp],valueDict["Rrun"])
+                maxCta += NShipFleet * rs.maxCtaFunc(fleets[Ngame][NshipComp][keyFleet]['CAPcnt'],fleets[Ngame][NshipComp][keyFleet]['d'][tOpTemp])
+    fleets[Ngame][NshipComp]['total']['maxCta'][elapsedYear] = maxCta
+    sumCta[Ngame] += maxCta
     for order in range(1,len(orderDict)+1):
         if orderDict[str(order)]['fuelType'] == 'HFO/Diesel':
-            fleets = rs.orderShipFunc(fleets,NshipComp,'HFO',int(orderDict[str(order)]['WPS']),int(orderDict[str(order)]['SPS']),int(orderDict[str(order)]['CCS']),float(orderDict[str(order)]['CAPcnt']),tOpSch,tbid,0,currentYear,elapsedYear,valueDict,NShipFleet,False,parameterFile2,parameterFile12,parameterFile3,parameterFile5)
+            fleets[Ngame] = rs.orderShipFunc(fleets[Ngame],NshipComp,'HFO',int(orderDict[str(order)]['WPS']),int(orderDict[str(order)]['SPS']),int(orderDict[str(order)]['CCS']),float(orderDict[str(order)]['CAPcnt']),tOpSch,tbid,0,currentYear,elapsedYear,valueDict,NShipFleet,False,parameterFile2,parameterFile12,parameterFile3,parameterFile5)
         else:
-            fleets = rs.orderShipFunc(fleets,NshipComp,orderDict[str(order)]['fuelType'],int(orderDict[str(order)]['WPS']),int(orderDict[str(order)]['SPS']),int(orderDict[str(order)]['CCS']),float(orderDict[str(order)]['CAPcnt']),tOpSch,tbid,0,currentYear,elapsedYear,valueDict,NShipFleet,False,parameterFile2,parameterFile12,parameterFile3,parameterFile5)
-    emit('my_response_userTable', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': elapsedYear, 'fleets': json.dumps(fleets,cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': currentYear,  'regulatorIDs': json.dumps(regulatorIDs,cls=MyEncoder), 'userDict': json.dumps(userDict,cls=MyEncoder)}, broadcast=True)
-    emit('my_response_nextYear', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': elapsedYear, 'fleets': json.dumps(fleets,cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': currentYear,  'regulatorIDs': json.dumps(regulatorIDs,cls=MyEncoder), 'userDict': json.dumps(userDict,cls=MyEncoder)})
+            fleets[Ngame] = rs.orderShipFunc(fleets[Ngame],NshipComp,orderDict[str(order)]['fuelType'],int(orderDict[str(order)]['WPS']),int(orderDict[str(order)]['SPS']),int(orderDict[str(order)]['CCS']),float(orderDict[str(order)]['CAPcnt']),tOpSch,tbid,0,currentYear,elapsedYear,valueDict,NShipFleet,False,parameterFile2,parameterFile12,parameterFile3,parameterFile5)
+    emit('my_response_userTable', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': elapsedYear, 'fleets': json.dumps(fleets[Ngame],cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': currentYear,  'regulatorIDs': json.dumps(regulatorIDs[Ngame],cls=MyEncoder), 'gameDict': json.dumps(gameDict[Ngame],cls=MyEncoder)}, broadcast=True)
+    emit('my_response_nextYear', {'type': userType, 'name': userName, 'no': userNo, 'elpsyear': elapsedYear, 'fleets': json.dumps(fleets[Ngame],cls=MyEncoder), 'tOpSch': tOpSch, 'currentYear': currentYear,  'regulatorIDs': json.dumps(regulatorIDs[Ngame],cls=MyEncoder), 'gameDict': json.dumps(gameDict[Ngame],cls=MyEncoder)})
 
 @socketio.event
 def yearlyOperation_event():
@@ -435,56 +478,57 @@ def yearlyOperation_event():
     global sumCta
     global figEach
     global figTotal
+    global Ngame
+    global gameDict
     userID = request.sid
-    userNo = userDict[userID]['userNo']
-    userType = userDict[userID]['userType']
-    userName = userDict[userID]['userName']
-    elapsedYear = userDict[userID]['elapsedYear']
+    userNo = gameDict[Ngame][userID]['userNo']
+    userType = gameDict[Ngame][userID]['userType']
+    userName = gameDict[Ngame][userID]['userName']
+    elapsedYear = gameDict[Ngame][userID]['elapsedYear']
     currentYear = elapsedYear+startYear
     Dtotal = rs.demandScenarioFunc(currentYear,valueDict["kDem1"],valueDict["kDem2"],valueDict["kDem3"],valueDict["kDem4"])
-    for userID in userDict.keys():
-        NshipComp = userDict[userID]['NshipComp']
+    for userID in gameDict[Ngame].keys():
+        NshipComp = gameDict[Ngame][userID]['NshipComp']
         if NshipComp != 0:
-            fleets[NshipComp]['total']['demand'][elapsedYear] = Dtotal
-            if Dtotal <= valueDict["rDMax"]*sumCta and Dtotal / sumCta > 0.0:
-                fleets[NshipComp]['total']['rocc'][elapsedYear] = Dtotal / sumCta
-            elif Dtotal > valueDict["rDMax"]*sumCta:
-                fleets[NshipComp]['total']['rocc'][elapsedYear] = valueDict["rDMax"]
-            fleets = rs.yearlyOperationFunc(fleets,NshipComp,startYear,elapsedYear,NShipFleet,tOpSch,valueDict,regDec['Subsidy'][nRegAct],regDec['Ctax'][nRegAct],parameterFile4)
+            fleets[Ngame][NshipComp]['total']['demand'][elapsedYear] = Dtotal
+            if Dtotal <= valueDict["rDMax"]*sumCta[Ngame] and Dtotal / sumCta[Ngame] > 0.0:
+                fleets[Ngame][NshipComp]['total']['rocc'][elapsedYear] = Dtotal / sumCta[Ngame]
+            elif Dtotal > valueDict["rDMax"]*sumCta[Ngame]:
+                fleets[Ngame][NshipComp]['total']['rocc'][elapsedYear] = valueDict["rDMax"]
+            fleets[Ngame] = rs.yearlyOperationFunc(fleets[Ngame],NshipComp,startYear,elapsedYear,NShipFleet,tOpSch,valueDict,regDec['Subsidy'][nRegAct[Ngame]],regDec['Ctax'][nRegAct[Ngame]],parameterFile4)
     # prepare the result figures
     #resPath = Path(__file__).parent
     resPath = 'roleplay/../app/static'
     shutil.rmtree(resPath)
     os.mkdir(resPath)
     removeList = []
-    figWidth = 400
-    figHeight = 400
+    figWidth = 600
+    figHeight = 500
     NshipCompTotal = 0
-    for userID in userDict.keys():
-        if userDict[userID]['userType'] == 'Shipping Company':
+    for userID in gameDict[Ngame].keys():
+        if gameDict[Ngame][userID]['userType'] == 'Shipping Company':
             NshipCompTotal += 1
-    keyList = list(fleets[1]['total'].keys())
+    keyList = list(fleets[Ngame][1]['total'].keys())
     #figWidth,figHeight = width/2-50, height/2
     for keyi in keyList:
-        if type(fleets[1]['total'][keyi]) is np.ndarray:
-            figEach[keyi] = rs.outputAllCompanyAppFunc(fleets,valueDict,startYear,elapsedYear,keyi,unitDict,figWidth/100-1,figHeight/100-1,NshipCompTotal)
-            figTotal[keyi] = rs.outputAllCompanyTotalAppFunc(fleets,valueDict,startYear,elapsedYear,keyi,unitDict,figWidth/100-1,figHeight/100-1,NshipCompTotal)
+        if type(fleets[Ngame][1]['total'][keyi]) is np.ndarray:
+            figEach[Ngame][keyi] = rs.outputAllCompanyAppFunc(fleets[Ngame],valueDict,startYear,elapsedYear,keyi,unitDict,figWidth/100-1,figHeight/100-1,NshipCompTotal)
+            figTotal[Ngame][keyi] = rs.outputAllCompanyTotalAppFunc(fleets[Ngame],valueDict,startYear,elapsedYear,keyi,unitDict,figWidth/100-1,figHeight/100-1,NshipCompTotal)
         else:
             removeList.append(keyi)
     for keyi in removeList:
         keyList.remove(keyi)
-    emit('my_response_yearlyOperation',{'keyList': keyList, 'figEach': json.dumps(figEach,cls=MyEncoder), 'figTotal': json.dumps(figTotal,cls=MyEncoder)},room='shipComp')
-    emit('my_response_yearlyOperation',{'keyList': keyList, 'figEach': json.dumps(figEach,cls=MyEncoder), 'figTotal': json.dumps(figTotal,cls=MyEncoder)},room='regulator')
-    for userID in userDict.keys():
-        userDict[userID]['elapsedYear'] += 1
+    emit('my_response_yearlyOperation',{'keyList': keyList, 'figEach': json.dumps(figEach[Ngame],cls=MyEncoder), 'figTotal': json.dumps(figTotal[Ngame],cls=MyEncoder)},room='shipComp')
+    emit('my_response_yearlyOperation',{'keyList': keyList, 'figEach': json.dumps(figEach[Ngame],cls=MyEncoder), 'figTotal': json.dumps(figTotal[Ngame],cls=MyEncoder)},room='regulator')
+    for userID in gameDict[Ngame].keys():
+        gameDict[Ngame][userID]['elapsedYear'] += 1
 
 @socketio.event
 def resultSelect_event():
     global figEach
     global figTotal
-    emit('my_response_result',{'figEach': json.dumps(figEach,cls=MyEncoder), 'figTotal': json.dumps(figTotal,cls=MyEncoder)},room='shipComp')
-
-
+    global Ngame
+    emit('my_response_result',{'figEach': json.dumps(figEach[Ngame],cls=MyEncoder), 'figTotal': json.dumps(figTotal[Ngame],cls=MyEncoder)},room='shipComp')
 
 @socketio.event
 def my_broadcast_event(message):
@@ -495,7 +539,6 @@ def my_broadcast_event(message):
          {'data': message['data'], 'count': session['receive_count'], 'nshipcomp': str(NshipComp)},
          broadcast=True)
 
-
 @socketio.event
 def join(message):
     join_room(message['room'])
@@ -504,7 +547,6 @@ def join(message):
          {'data': 'In rooms: ' + ', '.join(rooms()),
           'count': session['receive_count']})
 
-
 @socketio.event
 def leave(message):
     leave_room(message['room'])
@@ -512,7 +554,6 @@ def leave(message):
     emit('my_response',
          {'data': 'In rooms: ' + ', '.join(rooms()),
           'count': session['receive_count']})
-
 
 @socketio.on('close_room')
 def on_close_room(message):
@@ -549,7 +590,11 @@ def my_ping():
 
 @socketio.on('disconnect')
 def test_disconnect():
+    global userDict
+    global Ngame
     print('Client disconnected', request.sid)
+    userID = request.sid
+    userDict[userID]['Ngame'] = Ngame
 
 '''@app.route('/')
 def test():
