@@ -1,3 +1,3 @@
 # GHG reduction simulator
-developing now
+developing now...
  
