@@ -234,6 +234,10 @@ def additionalShippingFeeFunc(tOp, tOpSch, dcostFuelAll, costShipAll, costShipBa
         dcostShipping = dcostFuelAll
     return dcostShipping
 
+def demandInitialFunc(iniD,startYear,kDem1,kDem2,kDem3):
+    kDem4 = (kDem1*startYear**2 + kDem2*startYear + kDem3)*1000000000/iniD
+    return kDem4
+
 def demandScenarioFunc(year,kDem1,kDem2,kDem3,kDem4):
     Di = (kDem1*year**2 + kDem2*year + kDem3)*1000000000/kDem4
     return Di
@@ -1876,6 +1880,105 @@ def outputAllCompanyAppFunc(fleetAll,valueDict,startYear,elapsedYear,keyi,unitDi
     plt.close()
     return figName
 
+def outputAllCompanyAppLimitedFunc(fleetAll,gameDict,valueDict,kDem4,IMOgoal,startYear,elapsedYear,lastYear,keyi,unitDict,figWidth,figHeight):
+    plt.rcParams.update({'figure.max_open_warning': 0})
+    currentYear = startYear+elapsedYear
+    fig, ax = plt.subplots(1, 1, figsize=(figWidth, figHeight))
+    if lastYear == 2025:
+        ticArr = np.array([2021,2022,2023,2024,2025])
+    elif lastYear == 2030:
+        ticArr = np.array([2021,2022,2024,2026,2028,2030])
+    elif lastYear == 2035:
+        ticArr = np.array([2021,2023,2026,2029,2032,2035])
+    elif lastYear == 2040:
+        ticArr = np.array([2021,2024,2028,2032,2036,2040])
+    elif lastYear == 2045:
+        ticArr = np.array([2021,2025,2030,2035,2040,2045])
+    elif lastYear == 2050:
+        ticArr = np.array([2021,2025,2030,2035,2040,2045,2050])
+    NshipComp = 0
+    if keyi == 'profit':
+        title = 'Profit'
+    elif keyi == 'g':
+        title = 'CO2 emissions'
+    elif keyi == 'Idx':
+        title = 'Profit / CO2 emissions'
+    elif keyi == 'sale':
+        title = 'Sale'
+    elif keyi == 'costAll':
+        title = 'Cost'
+    elif keyi == 'maxCta':
+        title = 'Demand vs Transport Capacity'
+    year = fleetAll['year'][:elapsedYear+1]
+    if elapsedYear > 0:
+        for member in gameDict.keys():
+            if gameDict[member]['userType'] == 'Shipping Company':
+                NshipComp += 1
+                if keyi == 'maxCta':
+                    ax.plot(year,fleetAll[NshipComp]['total']['rocc'][elapsedYear]*fleetAll[NshipComp]['total'][keyi][:elapsedYear+1]/1000000,color=gameDict[member]['color'], marker=".",label=member)
+                else:
+                    ax.plot(year,fleetAll[NshipComp]['total'][keyi][:elapsedYear+1],color=gameDict[member]['color'], marker=".",label=member)
+                ax.set_title(title)
+                ax.set_xlabel('Year')
+                ax.ticklabel_format(style="sci",  axis="y",scilimits=(0,0))
+                ax.set_ylabel(unitDict[keyi])
+                #ax.title.set_size(10)
+                #ax.xaxis.label.set_size(10)
+                #ax.get_xaxis().get_major_formatter().set_useOffset(False)
+                #ax.get_xaxis().set_major_locator(MaxNLocator(integer=True))
+                ax.set_xticks(ticArr)
+                #ax.yaxis.label.set_size(10)
+    else:
+        for member in gameDict.keys():
+            if gameDict[member]['userType'] == 'Shipping Company':
+                NshipComp += 1
+                if keyi == 'maxCta':
+                    ax.scatter(startYear,fleetAll[NshipComp]['total']['rocc'][elapsedYear]*fleetAll[NshipComp]['total'][keyi][0]/1000000,color=gameDict[member]['color'],label=member)
+                else:
+                    ax.scatter(startYear,fleetAll[NshipComp]['total'][keyi][0],color=gameDict[member]['color'],label=member)
+                ax.set_title(title)
+                ax.set_xlabel('Year')
+                ax.ticklabel_format(style="sci",  axis="y",scilimits=(0,0))
+                ax.set_ylabel(unitDict[keyi])
+                #ax.title.set_size(10)
+                #ax.xaxis.label.set_size(10)
+                #ax.set_xticks(np.array([startYear-1,startYear,startYear+1]))
+                ax.set_xticks(np.array([startYear]))
+                #ax.yaxis.label.set_size(10)
+    if keyi == 'g':
+        IMOgoalArr = np.full(ticArr.shape,IMOgoal/NshipComp)
+        color = 'lime'
+        for member in gameDict.keys():
+            if gameDict[member]['userType'] == 'Regulator':
+                color = gameDict[member]['color']
+        ax.plot(ticArr,IMOgoalArr,color=color, marker=".",label="IMO goal")
+        ax.set_xticks(ticArr)
+    elif keyi == 'maxCta':
+        demand = np.zeros(ticArr.shape)
+        for i in range(ticArr.size):
+            demand[i] = demandScenarioFunc(ticArr[i],valueDict["kDem1"],valueDict["kDem2"],valueDict["kDem3"],kDem4)/1000000
+        color = 'lime'
+        for member in gameDict.keys():
+            if gameDict[member]['userType'] == 'Regulator':
+                color = gameDict[member]['color']
+        ax.plot(ticArr,demand,color=color, marker=".",label="Demand")
+        ax.set_xticks(ticArr)
+    y_min, y_max = ax.get_ylim()
+    if y_min >= 0:
+        ax.set_ylim(0, y_max*1.1)
+    else:
+        ax.set_ylim(y_min, y_max*1.1)
+    ax.legend()
+    ax.grid()
+    resPath = Path(__file__).parent
+    #resPath /= '../app/static'
+    resPath = 'roleplay/../app/static'
+    plt.ioff()
+    figName = keyi+'Each'+datetime.datetime.now().strftime('%Y%m%d%H%M%S')+'.png'
+    plt.savefig(str(resPath)+'/'+figName)
+    plt.close()
+    return figName
+
 def outputAllCompanyTotalAppFunc(fleetAll,valueDict,startYear,elapsedYear,keyi,unitDict,figWidth,figHeight,NshipComp):
     plt.rcParams.update({'figure.max_open_warning': 0})
     currentYear = startYear+elapsedYear
@@ -1917,6 +2020,93 @@ def outputAllCompanyTotalAppFunc(fleetAll,valueDict,startYear,elapsedYear,keyi,u
     y_min, y_max = ax.get_ylim()
     ax.set_ylim(0, y_max)
     ax.legend()
+    resPath = Path(__file__).parent
+    #resPath /= '../app/static'
+    resPath = 'roleplay/../app/static'
+    plt.ioff()
+    figName = keyi+'Total'+datetime.datetime.now().strftime('%Y%m%d%H%M%S')+'.png'
+    plt.savefig(str(resPath)+'/'+figName)
+    plt.close()
+    return figName
+
+def outputAllCompanyTotalAppLimitedFunc(fleetAll,gameDict,valueDict,kDem4,IMOgoal,startYear,elapsedYear,lastYear,keyi,unitDict,figWidth,figHeight):
+    plt.rcParams.update({'figure.max_open_warning': 0})
+    currentYear = startYear+elapsedYear
+    fig, ax = plt.subplots(1, 1, figsize=(figWidth, figHeight))
+    if lastYear == 2025:
+        ticArr = np.array([2021,2022,2023,2024,2025])
+    elif lastYear == 2030:
+        ticArr = np.array([2021,2022,2024,2026,2028,2030])
+    elif lastYear == 2035:
+        ticArr = np.array([2021,2023,2026,2029,2032,2035])
+    elif lastYear == 2040:
+        ticArr = np.array([2021,2024,2028,2032,2036,2040])
+    elif lastYear == 2045:
+        ticArr = np.array([2021,2025,2030,2035,2040,2045])
+    elif lastYear == 2050:
+        ticArr = np.array([2021,2025,2030,2035,2040,2045,2050])
+    year = fleetAll['year'][:elapsedYear+1]
+    NshipComp = 0
+    if keyi == 'profit':
+        title = 'Profit'
+    elif keyi == 'g':
+        title = 'CO2 emissions'
+    elif keyi == 'Idx':
+        title = 'Profit / CO2 emissions'
+    elif keyi == 'sale':
+        title = 'Sale'
+    elif keyi == 'costAll':
+        title = 'Cost'
+    elif keyi == 'maxCta':
+        title = 'Demand vs Transport Capacity'
+    for member in gameDict.keys():
+        if gameDict[member]['userType'] == 'Shipping Company':
+            NshipComp += 1
+            if keyi == 'maxCta':
+                tempArr = copy.deepcopy(fleetAll[NshipComp]['total']['rocc'][:elapsedYear+1]*fleetAll[NshipComp]['total'][keyi][:elapsedYear+1]/1000000)
+            else:
+                tempArr = copy.deepcopy(fleetAll[NshipComp]['total'][keyi][:elapsedYear+1])
+            if NshipComp == 1:
+                barArray = tempArr
+                ax.bar(year, barArray, color=gameDict[member]['color'],label=member)
+            else:
+                ax.bar(year, tempArr, bottom=barArray, color=gameDict[member]['color'],label=member)
+                barArray += tempArr
+            ax.set_title(title)
+            ax.set_xlabel('Year')
+            ax.ticklabel_format(style="sci",  axis="y",scilimits=(0,0))
+            ax.set_ylabel(unitDict[keyi])
+            #ax.title.set_size(10)
+            #ax.xaxis.label.set_size(10)
+            #ax.get_xaxis().get_major_formatter().set_useOffset(False)
+            #ax.get_xaxis().set_major_locator(MaxNLocator(integer=True))
+            ax.set_xticks(ticArr)
+            #ax.yaxis.label.set_size(10)
+    if keyi == 'g':
+        IMOgoalArr = np.full(ticArr.shape,IMOgoal)
+        color = 'lime'
+        for member in gameDict.keys():
+            if gameDict[member]['userType'] == 'Regulator':
+                color = gameDict[member]['color']
+        ax.plot(ticArr,IMOgoalArr,color=color, marker=".",label="IMO goal")
+        ax.set_xticks(ticArr)
+    elif keyi == 'maxCta':
+        demand = np.zeros(ticArr.shape)
+        for i in range(ticArr.size):
+            demand[i] = demandScenarioFunc(ticArr[i],valueDict["kDem1"],valueDict["kDem2"],valueDict["kDem3"],kDem4)/1000000
+        color = 'lime'
+        for member in gameDict.keys():
+            if gameDict[member]['userType'] == 'Regulator':
+                color = gameDict[member]['color']
+        ax.plot(ticArr,demand,color=color, marker=".",label="Demand")
+        ax.set_xticks(ticArr)
+    y_min, y_max = ax.get_ylim()
+    if y_min >= 0:
+        ax.set_ylim(0, y_max*1.1)
+    else:
+        ax.set_ylim(y_min, y_max*1.1)
+    ax.legend()
+    ax.grid()
     resPath = Path(__file__).parent
     #resPath /= '../app/static'
     resPath = 'roleplay/../app/static'

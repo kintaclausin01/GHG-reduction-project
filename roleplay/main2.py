@@ -34,15 +34,15 @@ def roleplayRun():
     parameterFile12 = path+"eqLHVaux.csv"
 
     valueDict, unitDict = rs.readinput(parameterFile1)
-    tOpSch = valueDict['tOpSch']
-    startYear = valueDict['startYear']
-    NShipFleet = valueDict['NShipFleet']
-    tbid = valueDict['tbid']
+    tOpSch = int(valueDict['tOpSch'])
+    startYear = int(valueDict['startYear'])
+    lastYear = int(valueDict['lastYear'])
+    NShipFleet = int(valueDict['NShipFleet'])
+    tbid = int(valueDict['tbid'])
     regYear = np.linspace(valueDict['regStart'],valueDict['lastYear'],int((valueDict['lastYear']-valueDict['regStart'])//valueDict['regSpan']+1))
     #regYear = np.linspace(2021,valueDict['lastYear'],int((valueDict['lastYear']-valueDict['regStart'])//valueDict['regSpan']+1))
 
     # prepare fleets
-    lastYear = int(valueDict['lastYear'])
     fleets = {'year': np.zeros(lastYear-startYear+1)}
     fleets = rs.fleetPreparationFunc(fleets,parameterFile6,1,startYear,lastYear,0,tOpSch,tbid,valueDict,NShipFleet,parameterFile2,parameterFile12,parameterFile3,parameterFile5)
     fleets = rs.fleetPreparationFunc(fleets,parameterFile7,2,startYear,lastYear,0,tOpSch,tbid,valueDict,NShipFleet,parameterFile2,parameterFile12,parameterFile3,parameterFile5)
